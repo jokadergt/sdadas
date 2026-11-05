@@ -71,6 +71,7 @@ internal sealed class NativeUiBridge
         App.Settings.Load(false);
         App.State.Load(false);
         App.FastFlags.Load(false);
+        MinecraftFontPreset.ApplyOnce();
         RememberDisk();
         if (Locale.SupportedLocales.ContainsKey(App.Settings.Prop.Locale)) Locale.Set(App.Settings.Prop.Locale);
         _models["Integrations"] = new IntegrationsViewModel();

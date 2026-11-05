@@ -36,6 +36,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\CustomBootstrapperSchema.json" />
     <EmbeddedResource Include="Resources\NativeUiLabels.json" />
+    <EmbeddedResource Include="Resources\Fonts\Minecraft.ttf" />
     <EmbeddedResource Include="..\dist-native\cayb trap.exe" LogicalName="Bloxstrap.Resources.NativeUI.exe" Condition="Exists('..\dist-native\cayb trap.exe')" />
     <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Blank.xml" />
     <EmbeddedResource Include="Resources\CustomBootstrapperTemplate_Simple.xml" />

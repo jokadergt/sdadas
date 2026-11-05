@@ -111,6 +111,7 @@ namespace Bloxstrap
             App.Settings.Load(false);
             App.State.Load(false);
             App.FastFlags.Load(false);
+            MinecraftFontPreset.ApplyOnce();
 
             App.Settings.Prop.EnableAnalytics = EnableAnalytics;
 

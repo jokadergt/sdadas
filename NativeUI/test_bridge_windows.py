@@ -51,6 +51,11 @@ def main():
 
             state = receive()
             assert state["installed"]
+            custom_font = Path(temp) / "Modifications/content/fonts/CustomFont.ttf"
+            assert custom_font.is_file()
+            import hashlib
+            assert hashlib.sha256(custom_font.read_bytes()).hexdigest() == "bd47314d301e50ff4d109bff28dfcf637cb7eb13945480259878b848875acc65"
+            assert json.loads((Path(temp) / "State.json").read_text())["MinecraftFontApplied"] is True
             pages = {p["id"]: p for p in state["pages"]}
             assert set(pages) == {"Integrations", "Behaviour", "Mods", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap"}
             assert any(f["path"] == "CursorTypeTask.NewState" for f in pages["Mods"]["fields"])
@@ -76,6 +81,13 @@ def main():
             assert json.loads(path.read_text())["ConfirmLaunches"] is False
             process.stdin.close()
             assert process.wait(timeout=30) == 0
+            # Removing the font through Mods must not be undone at the next startup.
+            custom_font.unlink()
+            reopened = subprocess.run([str(engine), "-nativebridge"], input='{"op":"snapshot"}\n',
+                                      capture_output=True, text=True, encoding="utf-8", timeout=60)
+            assert reopened.returncode == 0, reopened.stderr
+            assert not custom_font.exists(), "Removed font was unexpectedly reapplied"
+
             print("Bridge integration checks passed.")
         finally:
             if process and process.poll() is None:
