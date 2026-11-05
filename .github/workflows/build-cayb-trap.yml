@@ -25,7 +25,7 @@ jobs:
       - name: Test engine bridge using isolated settings
         shell: pwsh
         run: python NativeUI/test_bridge_windows.py 'dist/engine/cayb trap.exe'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cayb-trap-win-x64
           path: dist/
