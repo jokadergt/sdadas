@@ -1,0 +1,80 @@
+{
+  "Appearance": {
+    "Themes": "Tema Global",
+    "Theme": "Tema Global",
+    "Languages": "Idioma",
+    "SelectedLanguage": "Idioma",
+    "PreviewBootstrapperCommand": "Pré-visualização",
+    "AddCustomThemeCommand": "Novo",
+    "DeleteCustomThemeCommand": "Deletar",
+    "RenameCustomThemeCommand": "Renomear",
+    "EditCustomThemeCommand": "Editar",
+    "ExportCustomThemeCommand": "Exportar",
+    "Icons": "Ícone",
+    "Icon": "Ícone",
+    "ImageSource": "Ícone",
+    "IconType": "Ícone",
+    "BrowseCustomIconLocationCommand": "Pesquisar"
+  },
+  "Shortcuts": {
+    "ExtractIconsTask.NewState": "Extrair ícones do Roblox para a pasta",
+    "DesktopIconTask.NewState": "Ícone da Área de Trabalho",
+    "StartMenuIconTask.NewState": "Ícone do Menu Iniciar",
+    "PlayerIconTask.NewState": "Iniciar o Roblox",
+    "StudioIconTask.NewState": "Iniciar o Roblox Studio",
+    "SettingsIconTask.NewState": "Configurações do cayb trap"
+  },
+  "Integrations": {
+    "ActivityTrackingEnabled": "Ativar rastreamento de atividades",
+    "InnerContent.IsChecked": "Consultar Localização do Servidor",
+    "ShowServerDetailsEnabled": "Consultar Localização do Servidor",
+    "DisableAppPatchEnabled": "Não sair para o aplicativo do Roblox",
+    "DiscordActivityEnabled": "Mostrar atividade de jogo",
+    "DiscordActivityJoinEnabled": "Permitir a entrada de pessoas em seu jogo",
+    "DiscordAccountOnProfile": "Mostrar conta do Roblox",
+    "AddIntegrationCommand": "Novo",
+    "DeleteIntegrationCommand": "Deletar",
+    "BrowseIntegrationLocationCommand": "Pesquisar"
+  },
+  "Bloxstrap": {
+    "UpdateCheckingEnabled": "Atualizar o Bloxstrap automaticamente",
+    "AnalyticsEnabled": "Habilitar o envio de análises",
+    "WebEnvironmentVisibility": "Web environment",
+    "WebEnvironments": "Web environment",
+    "WebEnvironment": "Web environment",
+    "ExportDataCommand": "Exportar"
+  },
+  "Bootstrapper": {
+    "ConfirmLaunches": "Pedir confirmação ao abrir outra janela do Roblox",
+    "BackgroundUpdates": "Atualizações em segundo plano",
+    "IsRobloxInstallationMissing": "Forçar reinstalação do Roblox",
+    "ForceRobloxReinstallation": "Forçar reinstalação do Roblox"
+  },
+  "FastFlags": {
+    "UseFastFlagManager": "Permitir que Bloxstrap gerencie as Fast Flags",
+    "MSAALevels.Keys": "Qualidade antisserilhamento (MSAA)",
+    "SelectedMSAALevel": "Qualidade antisserilhamento (MSAA)",
+    "FixDisplayScaling": "Preserve a qualidade de renderização com o dimensionamento da tela",
+    "TextureQualities.Keys": "Qualidade da textura",
+    "SelectedTextureQuality": "Qualidade da textura",
+    "ResetConfiguration": "Redefinir tudo para os padrões",
+    "OpenFastFlagEditorCommand": "Editor de Fast Flag"
+  },
+  "Mods": {
+    "OpenModsFolderCommand": "Abrir pasta de mods",
+    "OpenCompatSettingsCommand": "Gerenciar configurações de compatibilidade",
+    "CursorTypeTask.Selections": "Ponteiro do mouse",
+    "CursorTypeTask.NewState": "Ponteiro do mouse",
+    "OldAvatarBackgroundTask.NewState": "Usar fundo antigo do editor de avatar",
+    "OldCharacterSoundsTask.NewState": "Emular sons de personagem antigos",
+    "EmojiFontTask.Selections": "Tipo de emoji favorito",
+    "EmojiFontTask.NewState": "Tipo de emoji favorito",
+    "ManageCustomFontCommand": "Remover fonte aplicada",
+    "ChooseCustomFontVisibility": "Usar fontes personalizadas",
+    "DeleteCustomFontVisibility": "Usar fontes personalizadas"
+  },
+  "FastFlagEditor": {
+    "Name": "Nome",
+    "Value": "Valor"
+  }
+}

@@ -1,0 +1,6 @@
+Interface C++ compilada com LLVM-MinGW 20261104 (x64 UCRT), C++17, -Wall -Wextra -Werror.
+PE Windows GUI x64 e recursos de icone/manifest verificados.
+SHA256: 369b10ea25f2f304184d01f6fd4f4d3bb110bf98543a3a6be419aad52ca82a8a
+
+NAO TESTADO: execucao no Windows, motor C# e integracao com Roblox.
+O executavel C++ depende do motor modificado em engine/cayb trap.exe.

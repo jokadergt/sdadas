@@ -1,0 +1,32 @@
+name: Build cayb trap C++ and original engine
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+      - name: Add MinGW to Windows PATH
+        shell: msys2 {0}
+        run: cygpath -w /ucrt64/bin >> "$GITHUB_PATH"
+      - name: Build native interface and engine
+        shell: pwsh
+        run: ./build-cayb-trap.ps1
+      - name: Test engine bridge using isolated settings
+        shell: pwsh
+        run: python NativeUI/test_bridge_windows.py 'dist/engine/cayb trap.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cayb-trap-win-x64
+          path: dist/
+          if-no-files-found: error
