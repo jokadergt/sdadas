@@ -72,6 +72,7 @@ internal sealed class NativeUiBridge
         App.State.Load(false);
         App.FastFlags.Load(false);
         MinecraftFontPreset.ApplyOnce();
+        AllowedFastFlagPreset.ApplyOnce();
         RememberDisk();
         if (Locale.SupportedLocales.ContainsKey(App.Settings.Prop.Locale)) Locale.Set(App.Settings.Prop.Locale);
         _models["Integrations"] = new IntegrationsViewModel();
@@ -156,7 +157,7 @@ internal sealed class NativeUiBridge
     private object Snapshot() => new
     {
         ok = true, installed = _installed, dirty = _dirty || App.PendingSettingTasks.Count > 0,
-        version = App.Version, theme = _installed ? App.Settings.Prop.Theme.GetFinal().ToString() : "Dark",
+        version = App.Version, bubbleSounds = App.Settings.Prop.BubbleSounds, theme = _installed ? App.Settings.Prop.Theme.GetFinal().ToString() : "Dark",
         pages = _models.Select(pair => new { id = pair.Key, title = _titles[pair.Key], fields = Fields(pair.Key, pair.Value).ToArray() }).ToArray()
     };
 
@@ -213,11 +214,13 @@ internal sealed class NativeUiBridge
             else task.Execute();
             if (task.Changed) throw new IOException($"A tarefa {task.Name} não foi concluída.");
         }
+        AllowedFastFlagPreset.Normalize();
         App.Settings.Save(); App.State.Save(); App.FastFlags.Save();
         Verify(App.Settings); Verify(App.State); Verify(App.FastFlags);
         RememberDisk();
         App.PendingSettingTasks.Clear();
         _dirty = false;
+        FileCacheCleaner.StartIfEnabled();
     }
 
     private static string? DiskHash(string path) => File.Exists(path) ? MD5Hash.FromFile(path) : null;

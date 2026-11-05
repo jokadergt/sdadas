@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Input;
 
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +20,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         public ICommand OpenFastFlagEditorCommand => new RelayCommand(OpenFastFlagEditor);
 
         public Visibility CanShowFastFlagEditor => App.IsStudioInstalled ? Visibility.Visible : Visibility.Collapsed;
+
+        public bool AutomaticAllowedFastFlags
+        {
+            get => App.Settings.Prop.AutomaticAllowedFastFlags;
+            set => App.Settings.Prop.AutomaticAllowedFastFlags = value;
+        }
 
         public bool UseFastFlagManager
         {

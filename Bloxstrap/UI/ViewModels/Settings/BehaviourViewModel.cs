@@ -1,7 +1,13 @@
-﻿namespace Bloxstrap.UI.ViewModels.Settings
+namespace Bloxstrap.UI.ViewModels.Settings
 {
     public class BehaviourViewModel : NotifyPropertyChangedViewModel
     {
+        public bool BackgroundFileCacheCleaner
+        {
+            get => App.Settings.Prop.BackgroundFileCacheCleaner;
+            set => App.Settings.Prop.BackgroundFileCacheCleaner = value;
+        }
+
         public bool ConfirmLaunches
         {
             get => App.Settings.Prop.ConfirmLaunches;

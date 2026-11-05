@@ -53,3 +53,21 @@ A interface C++ usa Segoe UI, como antes.
 Para trocar ou remover a fonte depois, use a seção Mods. A remoção fica respeitada
 nas próximas aberturas. Jogos que usam fontes próprias carregadas como assets
 podem não refletir a substituição das famílias locais do cliente.
+
+## Preset automático de FastFlags
+
+Na primeira abertura desta versão, o motor grava um preset com as 18 chaves da lista pública do Roblox consultada em 05/11/2026. A configuração anterior fica em `Backups/ClientAppSettings.before-allowed-preset.json`. Os valores são um preset equilibrado próprio, não valores oficiais padrão: D3D11 como única preferência de renderizador, texturas nível 2, MSAA 2x, distâncias de grama de 50/100 e opções de depuração visuais desligadas. As outras chaves também ficam explícitas no JSON. Não há promessa de aumento de FPS nem de efeito visível para toda flag.
+
+A opção **Preset automático** mantém o JSON limitado às 18 chaves e preenche as ausentes ao salvar. Desligue-a para edição manual, por exemplo para testes no Studio. O arquivo é aplicado na próxima inicialização do Roblox pelo cayb trap, com o jogo fechado. A lista efetiva de cada cliente/canal pode mudar; esta é a lista pública consultada, não uma garantia futura.
+
+Fonte: https://devforum.roblox.com/t/allowlist-for-local-client-configuration-via-fast-flags/3966569
+
+## Interface e som
+
+Botões, seletores, caixas de texto, navegação e cartões usam cantos arredondados. Os cliques têm um som curto de bolha gerado para o aplicativo, embutido no executável. A opção **Som de bolha nos cliques**, na seção cayb trap, permite desligá-lo. Os diálogos auxiliares WPF ainda são os originais.
+
+## Limpeza opcional de cache em segundo plano
+
+Na seção **Comportamento**, habilite **Limpar cache de arquivos em segundo plano** e salve. Ao iniciar Roblox/Studio, um processo auxiliar solicitará administrador pelo UAC. Se a autorização for negada, a limpeza não roda. Quando houver jogo aberto e uso de RAM de pelo menos 85%, o auxiliar libera o cache de arquivos do Windows, no máximo uma vez a cada cinco minutos; a primeira verificação que pode limpar ocorre após cinco minutos. Ele encerra após o jogo fechar ou a opção ser desativada, com até um minuto para perceber o fechamento e até 15 segundos para perceber a desativação.
+
+O recurso usa `SetSystemFileCacheSize(-1,-1,0)`: não limpa a lista standby inteira, não encerra programas, não reduz à força o working set do Roblox e não muda os limites permanentes do cache. O Windows pode preencher o cache novamente; limpar pode causar novas leituras do disco e não garante melhor desempenho. O teste de CI verifica a persistência da opção, mas não executa a limpeza privilegiada.

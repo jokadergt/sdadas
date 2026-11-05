@@ -1,0 +1,20 @@
+{
+  "DFIntCSGLevelOfDetailSwitchingDistance": "250",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL12": "500",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL23": "750",
+  "DFIntCSGLevelOfDetailSwitchingDistanceL34": "1000",
+  "FFlagHandleAltEnterFullscreenManually": "False",
+  "DFFlagTextureQualityOverrideEnabled": "True",
+  "DFIntTextureQualityOverride": "2",
+  "FIntDebugForceMSAASamples": "2",
+  "DFFlagDisableDPIScale": "True",
+  "FFlagDebugGraphicsPreferD3D11": "True",
+  "FFlagDebugSkyGray": "False",
+  "DFFlagDebugPauseVoxelizer": "False",
+  "DFIntDebugFRMQualityLevelOverride": "0",
+  "FIntFRMMaxGrassDistance": "100",
+  "FIntFRMMinGrassDistance": "50",
+  "FFlagDebugGraphicsPreferVulkan": "False",
+  "FFlagDebugGraphicsPreferOpenGL": "False",
+  "FIntGrassMovementReducedMotionFactor": "0"
+}

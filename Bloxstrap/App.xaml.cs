@@ -290,6 +290,12 @@ namespace Bloxstrap
 
             LaunchSettings = new LaunchSettings(e.Args);
 
+            if (e.Args.Length == 1 && e.Args[0] == "-cachecleaner")
+            {
+                FileCacheCleaner.Run();
+                return;
+            }
+
             if (e.Args.Length == 1 && e.Args[0] == "-nativebridge")
             {
                 NativeUiBridge.Start();
@@ -390,6 +396,7 @@ namespace Bloxstrap
                 State.Load();
                 FastFlags.Load();
                 MinecraftFontPreset.ApplyOnce();
+                AllowedFastFlagPreset.ApplyOnce();
 
                 if (!Locale.SupportedLocales.ContainsKey(Settings.Prop.Locale))
                 {

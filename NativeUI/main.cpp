@@ -12,6 +12,7 @@
 #include <shellapi.h>
 #include <dwmapi.h>
 #include <uxtheme.h>
+#include <mmsystem.h>
 #include <string>
 #include <vector>
 #include <thread>
@@ -26,6 +27,7 @@ static HFONT font, titleFont;
 static HBRUSH background, cardBrush;
 static COLORREF canvasColor = RGB(32,32,32), inkColor = RGB(240,240,240), cardColor = RGB(48,48,48), selectionColor = RGB(52,52,52);
 static bool darkTheme = true;
+static bool bubbleSounds = true;
 static HANDLE engineInput = nullptr, engineProcess = nullptr;
 static json snapshot = {{"installed", false}, {"dirty", false}, {"pages", json::array()}};
 static WPARAM generation = 0;
@@ -57,12 +59,80 @@ static std::wstring text(HWND h) {
     GetWindowTextW(h, result.data(), (int)result.size());
     result.resize(wcslen(result.c_str())); return result;
 }
+
+static void bubbleClick() {
+    if (bubbleSounds) PlaySoundW(MAKEINTRESOURCEW(3), instance, SND_RESOURCE | SND_ASYNC | SND_NODEFAULT);
+}
+static void roundControl(HWND h) {
+    RECT r{}; GetClientRect(h, &r);
+    if (r.right <= 0 || r.bottom <= 0) return;
+    HRGN region = CreateRoundRectRgn(0, 0, r.right + 1, r.bottom + 1, 14, 14);
+    if (!SetWindowRgn(h, region, TRUE)) DeleteObject(region);
+}
+static bool drawButton(LPARAM lp) {
+    auto* item = (DRAWITEMSTRUCT*)lp;
+    if (!item || item->CtlType != ODT_BUTTON) return false;
+    HDC dc = item->hDC; RECT r = item->rcItem;
+    FillRect(dc, &r, background);
+    bool enabled = !(item->itemState & ODS_DISABLED);
+    bool primary = item->CtlID == 10 || item->CtlID == IDOK;
+    COLORREF fill = primary && enabled ? RGB(96,205,255) : (item->itemState & ODS_SELECTED) ? selectionColor : cardColor;
+    HBRUSH brush = CreateSolidBrush(fill); HPEN pen = CreatePen(PS_SOLID, 1, selectionColor);
+    HGDIOBJ oldBrush = SelectObject(dc, brush), oldPen = SelectObject(dc, pen), oldFont = SelectObject(dc, font);
+    RoundRect(dc, r.left, r.top, r.right, r.bottom, 14, 14);
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, !enabled ? RGB(135,135,135) : primary ? RGB(16,25,30) : inkColor);
+    auto label = text(item->hwndItem); InflateRect(&r, -10, -3);
+    DrawTextW(dc, label.c_str(), -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    if (item->itemState & ODS_FOCUS) { InflateRect(&r, -2, -2); DrawFocusRect(dc, &r); }
+    SelectObject(dc, oldFont); SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(brush); DeleteObject(pen);
+    return true;
+}
+static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
+    if (msg == WM_SIZE) roundControl(h);
+    if (msg == WM_NCDESTROY) RemoveWindowSubclass(h, RoundedControlProc, 1);
+    bool toggle = (GetWindowLongPtrW(h, GWL_STYLE) & BS_TYPEMASK) == BS_AUTOCHECKBOX;
+    wchar_t className[32]{}; GetClassNameW(h, className, 32);
+    toggle = toggle && _wcsicmp(className, L"BUTTON") == 0;
+    if (toggle && msg == WM_PAINT) {
+        PAINTSTRUCT ps{}; HDC dc = BeginPaint(h, &ps); RECT r{}; GetClientRect(h, &r);
+        FillRect(dc, &r, background);
+        HBRUSH card = CreateSolidBrush(cardColor); HGDIOBJ oldBrush = SelectObject(dc, card), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
+        RoundRect(dc, 0, 0, r.right, r.bottom, 14, 14);
+        bool checked = SendMessageW(h, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        int x = r.right - 52, y = (r.bottom - 20) / 2;
+        HBRUSH track = CreateSolidBrush(checked ? RGB(96,205,255) : selectionColor); SelectObject(dc, track);
+        RoundRect(dc, x, y, x + 38, y + 20, 20, 20);
+        HBRUSH thumb = CreateSolidBrush(checked ? RGB(22,30,36) : inkColor); SelectObject(dc, thumb);
+        int tx = x + (checked ? 21 : 3); Ellipse(dc, tx, y + 3, tx + 14, y + 17);
+        HGDIOBJ oldFont = SelectObject(dc, font); SetBkMode(dc, TRANSPARENT); SetTextColor(dc, inkColor);
+        RECT label{12, 0, x - 12, r.bottom}, measure = label; auto value = text(h);
+        DrawTextW(dc, value.c_str(), -1, &measure, DT_WORDBREAK | DT_CALCRECT);
+        label.top = std::max(0L, (r.bottom - measure.bottom) / 2);
+        DrawTextW(dc, value.c_str(), -1, &label, DT_WORDBREAK);
+        if (GetFocus() == h) { RECT focus{6,6,r.right-6,r.bottom-6}; DrawFocusRect(dc, &focus); }
+        SelectObject(dc, oldFont); SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
+        DeleteObject(card); DeleteObject(track); DeleteObject(thumb); EndPaint(h, &ps); return 0;
+    }
+    LRESULT result = DefSubclassProc(h, msg, wp, lp);
+    if (toggle && (msg == BM_SETCHECK || msg == WM_SETFOCUS || msg == WM_KILLFOCUS || msg == WM_ENABLE)) InvalidateRect(h, nullptr, TRUE);
+    return result;
+}
+
 static void message(const std::string& value) { MessageBoxW(windowHandle, wide(value).c_str(), L"cayb trap", MB_OK | MB_ICONERROR); }
 static HWND control(HWND parent, const wchar_t* klass, const std::wstring& value, DWORD style, int id = 0) {
+    if (_wcsicmp(klass, L"BUTTON") == 0 && ((style & BS_TYPEMASK) == BS_PUSHBUTTON || (style & BS_TYPEMASK) == BS_DEFPUSHBUTTON))
+        style = (style & ~BS_TYPEMASK) | BS_OWNERDRAW;
     HWND h = CreateWindowExW(0, klass, value.c_str(), WS_CHILD | WS_VISIBLE | style,
         0, 0, 0, 0, parent, (HMENU)(INT_PTR)id, instance, nullptr);
     SendMessageW(h, WM_SETFONT, (WPARAM)font, TRUE);
-    SetWindowTheme(h, darkTheme ? L"DarkMode_Explorer" : L"Explorer", nullptr); return h;
+    SetWindowTheme(h, darkTheme ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+    SetWindowSubclass(h, RoundedControlProc, 1, 0);
+    if (_wcsicmp(klass, L"COMBOBOX") == 0) {
+        COMBOBOXINFO info{sizeof(info)};
+        if (GetComboBoxInfo(h, &info) && info.hwndList) SetWindowSubclass(info.hwndList, RoundedControlProc, 1, 0);
+    }
+    return h;
 }
 static void setBusy(bool value) {
     busy = value;
@@ -181,8 +251,10 @@ static void renderPage(bool resetScroll = true) {
 struct JsonEditor { HWND edit = nullptr; bool done = false, accepted = false; json value; };
 static LRESULT CALLBACK EditorProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     auto* state = (JsonEditor*)GetWindowLongPtrW(h, GWLP_USERDATA);
+    if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_CREATE) {
         state = (JsonEditor*)((CREATESTRUCTW*)lp)->lpCreateParams; SetWindowLongPtrW(h, GWLP_USERDATA, (LONG_PTR)state);
+        DWORD corners = 2; DwmSetWindowAttribute(h, 33, &corners, sizeof(corners));
         state->edit = control(h, L"EDIT", wide(state->value.dump(2)), WS_TABSTOP | WS_BORDER | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN, 1);
         SendMessageW(state->edit, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         control(h, L"BUTTON", L"Aplicar", WS_TABSTOP | BS_DEFPUSHBUTTON, IDOK);
@@ -193,6 +265,7 @@ static LRESULT CALLBACK EditorProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         MoveWindow(GetDlgItem(h, IDOK), r.right - 224, r.bottom - 42, 100, 30, TRUE);
         MoveWindow(GetDlgItem(h, IDCANCEL), r.right - 112, r.bottom - 42, 100, 30, TRUE);
     } else if (msg == WM_COMMAND && state && HIWORD(wp) == BN_CLICKED) {
+        bubbleClick();
         if (LOWORD(wp) == IDOK) {
             try {
                 auto parsed = json::parse(utf8(text(state->edit)));
@@ -278,8 +351,10 @@ static bool runEngine(const wchar_t* arguments, bool reconnect) {
 }
 
 static LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_COMMAND && !busy && !rebuilding) {
         int id = LOWORD(wp);
+        if (HIWORD(wp) == BN_CLICKED || HIWORD(wp) == CBN_SELCHANGE) bubbleClick();
         if (id >= 3000 && id < 3000 + (int)fields.size()) { editJson(id - 3000); return 0; }
         if (id >= 1000 && id < 1000 + (int)fields.size() && HIWORD(wp) == BN_CLICKED) {
             auto& f = fields[id - 1000];
@@ -340,15 +415,20 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         control(h, L"BUTTON", L"Studio", WS_TABSTOP, 13);
         installButton = control(h, L"BUTTON", L"Instalar / reconectar", WS_TABSTOP, 14);
         BOOL dark = TRUE; DwmSetWindowAttribute(h, 20, &dark, sizeof(dark));
+        DWORD corners = 2; DwmSetWindowAttribute(h, 33, &corners, sizeof(corners));
         layout(); startBridge(); return 0;
     }
     if (msg == WM_GETMINMAXINFO) { auto* info = (MINMAXINFO*)lp; info->ptMinTrackSize = {1000, 620}; return 0; }
     if (msg == WM_SIZE) { if (panel) layout(); return 0; }
     if (msg == WM_MEASUREITEM) { ((MEASUREITEMSTRUCT*)lp)->itemHeight = 46; return TRUE; }
+    if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_DRAWITEM && wp == 1) {
         auto* item = (DRAWITEMSTRUCT*)lp; if (item->itemID == (UINT)-1) return TRUE;
         bool selected = item->itemState & ODS_SELECTED;
-        HBRUSH brush = CreateSolidBrush(selected ? selectionColor : canvasColor); FillRect(item->hDC, &item->rcItem, brush); DeleteObject(brush);
+        HBRUSH brush = CreateSolidBrush(selected ? selectionColor : canvasColor); FillRect(item->hDC, &item->rcItem, background);
+        HGDIOBJ previousBrush = SelectObject(item->hDC, brush), previousPen = SelectObject(item->hDC, GetStockObject(NULL_PEN));
+        RoundRect(item->hDC, item->rcItem.left, item->rcItem.top, item->rcItem.right, item->rcItem.bottom, 14, 14);
+        SelectObject(item->hDC, previousBrush); SelectObject(item->hDC, previousPen); DeleteObject(brush);
         if (selected) { RECT marker = item->rcItem; marker.right = marker.left + 3; marker.top += 10; marker.bottom -= 10;
             HBRUSH accent = CreateSolidBrush(RGB(96, 205, 255)); FillRect(item->hDC, &marker, accent); DeleteObject(accent); }
         wchar_t label[256]{}; SendMessageW(nav, LB_GETTEXT, item->itemID, (LPARAM)label);
@@ -365,6 +445,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             return 0;
         }
         snapshot = *reply;
+        bubbleSounds = snapshot.value("bubbleSounds", true);
         darkTheme = snapshot.value("theme", "Dark") != "Light";
         canvasColor = darkTheme ? RGB(32,32,32) : RGB(243,243,243);
         inkColor = darkTheme ? RGB(240,240,240) : RGB(24,24,24);
@@ -394,6 +475,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     }
     if (msg == WM_COMMAND && !rebuilding) {
         int id = LOWORD(wp);
+        if ((id != 1 && HIWORD(wp) == BN_CLICKED) || (id == 1 && HIWORD(wp) == LBN_SELCHANGE)) bubbleClick();
         if (id == 11) SendMessageW(h, WM_CLOSE, 0, 0);
         else if (id == 14 && !busy) {
             if (!bridgeAlive && !engineMissing) { startBridge(); }

@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using ICSharpCode.SharpZipLib.Zip;
@@ -14,6 +14,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
         {
             get => App.Settings.Prop.CheckForUpdates;
             set => App.Settings.Prop.CheckForUpdates = value;
+        }
+
+        public bool BubbleSounds
+        {
+            get => App.Settings.Prop.BubbleSounds;
+            set => App.Settings.Prop.BubbleSounds = value;
         }
 
         public bool AnalyticsEnabled

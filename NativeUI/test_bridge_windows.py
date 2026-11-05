@@ -56,6 +56,10 @@ def main():
             import hashlib
             assert hashlib.sha256(custom_font.read_bytes()).hexdigest() == "bd47314d301e50ff4d109bff28dfcf637cb7eb13945480259878b848875acc65"
             assert json.loads((Path(temp) / "State.json").read_text())["MinecraftFontApplied"] is True
+            expected_flags = json.loads((Path(__file__).resolve().parents[1] / "Bloxstrap/Resources/AllowedFastFlags.json").read_text())
+            flags_path = Path(temp) / "Modifications/ClientSettings/ClientAppSettings.json"
+            assert len(expected_flags) == 18
+            assert json.loads(flags_path.read_text()) == expected_flags
             pages = {p["id"]: p for p in state["pages"]}
             assert set(pages) == {"Integrations", "Behaviour", "Mods", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap"}
             assert any(f["path"] == "CursorTypeTask.NewState" for f in pages["Mods"]["fields"])
@@ -68,6 +72,21 @@ def main():
             settings = json.loads((Path(temp) / "Settings.json").read_text(encoding="utf-8-sig"))
             assert settings["ConfirmLaunches"] is True
             assert settings["BootstrapperTitle"] == "Capybara test"
+            assert json.loads(flags_path.read_text()) == expected_flags, "Unlisted flags were not removed"
+            assert settings["BackgroundFileCacheCleaner"] is False
+            assert settings["BubbleSounds"] is True
+            conflicting = dict(expected_flags, FFlagDebugGraphicsPreferVulkan="True", FFlagDebugGraphicsPreferOpenGL="True")
+            request({"op": "save", "changes": [{"page":"FastFlags", "path":"$flags", "value":conflicting}]})
+            resolved = json.loads(flags_path.read_text())
+            assert sum(resolved[k].lower() == "true" for k in ["FFlagDebugGraphicsPreferD3D11","FFlagDebugGraphicsPreferVulkan","FFlagDebugGraphicsPreferOpenGL"]) == 1
+            changed = request({"op": "save", "changes": [
+                {"page":"Behaviour", "path":"BackgroundFileCacheCleaner", "value":True},
+                {"page":"Bloxstrap", "path":"BubbleSounds", "value":False}]})
+            assert changed["bubbleSounds"] is False
+            assert json.loads((Path(temp)/"Settings.json").read_text())["BackgroundFileCacheCleaner"] is True
+            request({"op":"save", "changes":[{"page":"Behaviour", "path":"BackgroundFileCacheCleaner", "value":False}]})
+            settings = json.loads((Path(temp)/"Settings.json").read_text())
+
             assert (Path(temp) / "Modifications/content/sounds/action_jump.mp3").is_file()
             request({"op": "command", "page": "Mods", "path": "NotACommand"}, ok=False)
             request({"op": "apply", "changes": [

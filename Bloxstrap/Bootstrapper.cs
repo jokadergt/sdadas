@@ -622,6 +622,8 @@ namespace Bloxstrap
                 throw;
             }
 
+            FileCacheCleaner.StartIfEnabled();
+
             App.Logger.WriteLine(LOG_IDENT, $"Started Roblox (PID {_appPid}), waiting for log file");
 
             logCreatedEvent.WaitOne(TimeSpan.FromSeconds(15));

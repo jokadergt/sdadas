@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 
 namespace Bloxstrap.Models.Persistable
 {
@@ -16,6 +16,9 @@ namespace Bloxstrap.Models.Persistable
         public bool ConfirmLaunches { get; set; } = false;
         public string Locale { get; set; } = "nil";
         public bool UseFastFlagManager { get; set; } = true;
+        public bool AutomaticAllowedFastFlags { get; set; } = true;
+        public bool BackgroundFileCacheCleaner { get; set; } = false;
+        public bool BubbleSounds { get; set; } = true;
         public bool WPFSoftwareRender { get; set; } = false;
         public bool EnableAnalytics { get; set; } = true;
         public bool BackgroundUpdatesEnabled { get; set; } = false;

@@ -42,7 +42,8 @@
     "WebEnvironmentVisibility": "Web environment",
     "WebEnvironments": "Web environment",
     "WebEnvironment": "Web environment",
-    "ExportDataCommand": "Exportar"
+    "ExportDataCommand": "Exportar",
+    "BubbleSounds": "Som de bolha nos cliques"
   },
   "Bootstrapper": {
     "ConfirmLaunches": "Pedir confirmação ao abrir outra janela do Roblox",
@@ -58,7 +59,8 @@
     "TextureQualities.Keys": "Qualidade da textura",
     "SelectedTextureQuality": "Qualidade da textura",
     "ResetConfiguration": "Redefinir tudo para os padrões",
-    "OpenFastFlagEditorCommand": "Editor de Fast Flag"
+    "OpenFastFlagEditorCommand": "Editor de Fast Flag",
+    "AutomaticAllowedFastFlags": "Preset automático — 18 flags da lista pública (05/11/2026)"
   },
   "Mods": {
     "OpenModsFolderCommand": "Abrir pasta de mods",
@@ -76,5 +78,8 @@
   "FastFlagEditor": {
     "Name": "Nome",
     "Value": "Valor"
+  },
+  "Behaviour": {
+    "BackgroundFileCacheCleaner": "Limpar cache de arquivos em segundo plano (RAM ≥85%, administrador)"
   }
 }
