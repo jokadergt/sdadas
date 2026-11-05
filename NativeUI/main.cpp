@@ -23,6 +23,7 @@ using json = nlohmann::json;
 static HWND windowHandle, nav, panel, heading, status, saveButton, installButton;
 static HINSTANCE instance;
 static HFONT font, titleFont;
+static HANDLE privateFont = nullptr;
 static HBRUSH background, cardBrush;
 static COLORREF canvasColor = RGB(32,32,32), inkColor = RGB(240,240,240), cardColor = RGB(48,48,48), selectionColor = RGB(52,52,52);
 static bool darkTheme = true;
@@ -437,8 +438,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int show) {
     HANDLE singleton = CreateMutexW(nullptr, FALSE, L"Local\\CaybTrapCppSettings");
     if (GetLastError() == ERROR_ALREADY_EXISTS) { MessageBoxW(nullptr, L"A interface já está aberta.", L"cayb trap", MB_OK); if (singleton) CloseHandle(singleton); return 0; }
     INITCOMMONCONTROLSEX ic{sizeof(ic), ICC_STANDARD_CLASSES}; InitCommonControlsEx(&ic);
-    font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-    titleFont = CreateFontW(-26, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+    // The supplied Minecraft font stays embedded and private to this process.
+    if (HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(2), RT_RCDATA)) {
+        HGLOBAL loaded = LoadResource(instance, resource);
+        void* data = loaded ? LockResource(loaded) : nullptr;
+        DWORD size = SizeofResource(instance, resource), fontCount = 0;
+        if (data && size) privateFont = AddFontMemResourceEx(data, size, nullptr, &fontCount);
+    }
+    const wchar_t* typeface = privateFont ? L"Minecraft" : L"Segoe UI";
+    DWORD quality = privateFont ? NONANTIALIASED_QUALITY : CLEARTYPE_QUALITY;
+    font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, quality, 0, typeface);
+    titleFont = CreateFontW(-26, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, quality, 0, typeface);
     background = CreateSolidBrush(canvasColor); cardBrush = CreateSolidBrush(cardColor);
     WNDCLASSW wc{}; wc.hInstance = instance; wc.hCursor = LoadCursorW(nullptr, IDC_ARROW); wc.hbrBackground = background;
     wc.lpfnWndProc = PanelProc; wc.lpszClassName = L"CaybPanel"; RegisterClassW(&wc);
@@ -455,5 +465,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int show) {
     if (engineProcess) CloseHandle(engineProcess);
     if (singleton) CloseHandle(singleton);
     DeleteObject(font); DeleteObject(titleFont); DeleteObject(background); DeleteObject(cardBrush);
+    if (privateFont) RemoveFontMemResourceEx(privateFont);
     return (int)msg.wParam;
 }
