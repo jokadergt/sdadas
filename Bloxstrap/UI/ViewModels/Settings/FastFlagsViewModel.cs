@@ -21,6 +21,12 @@ namespace Bloxstrap.UI.ViewModels.Settings
 
         public Visibility CanShowFastFlagEditor => App.IsStudioInstalled ? Visibility.Visible : Visibility.Collapsed;
 
+        public bool LowGraphicsMode
+        {
+            get => App.Settings.Prop.LowGraphicsMode;
+            set => PerformanceGraphics.SetEnabled(value);
+        }
+
         public bool AutomaticAllowedFastFlags
         {
             get => App.Settings.Prop.AutomaticAllowedFastFlags;

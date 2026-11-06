@@ -66,7 +66,8 @@
     "SelectedTextureQuality": "Qualidade das texturas",
     "ResetConfiguration": "Redefinir FastFlags ao salvar",
     "OpenFastFlagEditorCommand": "Editor de Fast Flag",
-    "AutomaticAllowedFastFlags": "Preset automático — 18 flags da lista pública (05/11/2026)"
+    "AutomaticAllowedFastFlags": "Preset automático — 18 flags da lista pública (05/11/2026)",
+    "LowGraphicsMode": "Perfil de desempenho — reduzir detalhes gráficos"
   },
   "Mods": {
     "OpenModsFolderCommand": "Abrir pasta de modificações",

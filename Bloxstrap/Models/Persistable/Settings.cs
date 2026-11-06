@@ -16,6 +16,7 @@ namespace Bloxstrap.Models.Persistable
         public bool ConfirmLaunches { get; set; } = false;
         public string Locale { get; set; } = "nil";
         public bool UseFastFlagManager { get; set; } = true;
+        public bool LowGraphicsMode { get; set; } = false;
         public bool AutomaticAllowedFastFlags { get; set; } = true;
         public bool BackgroundFileCacheCleaner { get; set; } = false;
         public bool BubbleSounds { get; set; } = true;

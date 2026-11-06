@@ -91,3 +91,21 @@ A API consulta a busca pública `/search/?s=...`, mantém até oito pesquisas em
 **Restaurar padrão** remove essas substituições para que o mecanismo original restaure os arquivos padrão na próxima abertura. Substituições anteriores ficam em `Backups/Cursors`. As criações, nomes e direitos pertencem aos autores/Sweezy; o botão **Ver no Sweezy** abre a página original. A integração não é afiliada ao site e não contorna restrições de acesso: se houver bloqueio, limite de requisições ou mudança no HTML, o aplicativo mostra uma mensagem em português.
 
 A busca pública e os downloads usados foram verificados em 06/11/2026. O build testa análise do HTML, validação PNG, instalação/restauração em pasta temporária e tenta uma pesquisa e download reais. Indisponibilidade de rede do serviço é reportada separadamente, sem fingir resultados. O funcionamento visual dentro de uma sessão real do Roblox não é testado no CI.
+
+## Perfil de desempenho gráfico
+
+Na seção **FastFlags**, habilite **Perfil de desempenho — reduzir detalhes gráficos** e salve (ou clique em Roblox, que salva automaticamente). O perfil fica desligado por padrão. Os valores anteriores dos cinco ajustes e a preferência do gerenciador são guardados no estado do aplicativo e restaurados ao desligá-lo.
+
+| Ajuste | Valor enquanto o perfil está ativo |
+| --- | --- |
+| DFFlagTextureQualityOverrideEnabled | True |
+| DFIntTextureQualityOverride | 0 — qualidade mínima |
+| FIntDebugForceMSAASamples | 1 — MSAA 1× |
+| FIntFRMMinGrassDistance | 0 |
+| FIntFRMMaxGrassDistance | 0 |
+
+O perfil reaplica esses cinco valores ao salvar e ao carregar a configuração, inclusive se o JSON tiver sido editado externamente. Os seletores conflitantes ficam bloqueados na interface enquanto o perfil está ativo. Desligue-o para ajustar texturas/MSAA manualmente. O renderizador escolhido é preservado.
+
+Este perfil reduz qualidade/detalhes; não transforma todas as partes em objetos sem textura e não remove ícones de avatares, inventários, itens ou VFX de todas as experiências. A lista pública consultada em 06/11/2026 não oferece controles globais para essas remoções. Não são apagados arquivos do cliente, não há alteração de memória ou scripts de mapas de terceiros. O efeito depende do cliente reconhecer as flags e do conteúdo do mapa; não foi medido ganho de FPS.
+
+Feche e reabra o Roblox pelo cayb trap para aplicar ou reverter. O teste Windows verifica gravação, persistência do backup, prioridade do perfil sobre edições conflitantes e restauração dos valores. Isso não substitui validação visual em uma sessão real do jogo.

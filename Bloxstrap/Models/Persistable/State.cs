@@ -5,6 +5,9 @@ namespace Bloxstrap.Models.Persistable
         public bool PromptWebView2Install { get; set; } = true;
 
         // Records one-time application; removing the font in Mods will stay respected.
+        public Dictionary<string, string?>? PerformanceOriginalFlags { get; set; }
+        public bool? PerformanceOriginalManager { get; set; }
+
         public string SweezyCursorSlug { get; set; } = "";
         public string SweezyCursorName { get; set; } = "";
 

@@ -99,6 +99,25 @@ def main():
             assert settings["BackgroundUpdatesEnabled"] is True
             assert settings["BootstrapperTitle"] == "Capybara test"
             assert json.loads(flags_path.read_text()) == expected_flags, "Unlisted flags were not removed"
+            # The graphics profile must persist, enforce its values, and restore the user's prior choices.
+            before_profile = json.loads(flags_path.read_text())
+            assert settings["LowGraphicsMode"] is False
+            enabled = request({"op":"save", "changes":[{"page":"FastFlags", "path":"LowGraphicsMode", "value":True}]})
+            minimum = {"DFFlagTextureQualityOverrideEnabled":"True", "DFIntTextureQualityOverride":"0", "FIntDebugForceMSAASamples":"1", "FIntFRMMinGrassDistance":"0", "FIntFRMMaxGrassDistance":"0"}
+            actual = json.loads(flags_path.read_text())
+            assert all(actual[key] == value for key,value in minimum.items())
+            backup = json.loads((Path(temp)/"State.json").read_text())["PerformanceOriginalFlags"]
+            assert backup == {key:before_profile.get(key) for key in minimum}
+            fast_page = next(page for page in enabled["pages"] if page["id"] == "FastFlags")
+            assert next(field for field in fast_page["fields"] if field["path"] == "SelectedTextureQuality")["enabled"] is False
+            changed_flags = dict(actual, DFIntTextureQualityOverride="3")
+            request({"op":"save", "changes":[{"page":"FastFlags", "path":"$flags", "value":changed_flags}]})
+            assert json.loads(flags_path.read_text())["DFIntTextureQualityOverride"] == "0"
+            request({"op":"save", "changes":[{"page":"FastFlags", "path":"LowGraphicsMode", "value":False}]})
+            assert json.loads(flags_path.read_text()) == before_profile
+            assert json.loads((Path(temp)/"State.json").read_text())["PerformanceOriginalFlags"] is None
+            print("Reversible graphics profile checks passed.")
+
             assert settings["BackgroundFileCacheCleaner"] is False
             assert settings["BubbleSounds"] is True
             conflicting = dict(expected_flags, FFlagDebugGraphicsPreferVulkan="True", FFlagDebugGraphicsPreferOpenGL="True")

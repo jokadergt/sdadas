@@ -163,10 +163,16 @@ internal sealed class NativeUiBridge
                 value = state.GetValue(value);
             }
             else if (!property.CanWrite) continue;
+            bool enabled = !(page == "FastFlags" && App.Settings.Prop.LowGraphicsMode &&
+                path is "UseFastFlagManager" or "SelectedMSAALevel" or "SelectedTextureQuality");
             if (type == typeof(bool))
-                yield return new { path, label = Label(page, path), kind = "bool", value };
+            {
+                yield return new { path, label = Label(page, path), kind = "bool", value, enabled };
+                if (page == "FastFlags" && path == "LowGraphicsMode")
+                    yield return new { path = "$graphicsInfo", label = "Reduz a qualidade das texturas, usa MSAA 1× e zera a distância da grama do Terrain. Ícones, avatares e VFX dos mapas não são removidos por este perfil. Aplique na próxima abertura do Roblox.", kind = "info" };
+            }
             else if (type.IsEnum)
-                yield return new { path, label = Label(page, path), kind = "enum", value = value?.ToString(), choices = Enum.GetNames(type), choiceLabels = Enum.GetNames(type).Select(name => EnumLabel(type, name)).ToArray() };
+                yield return new { path, label = Label(page, path), kind = "enum", value = value?.ToString(), choices = Enum.GetNames(type), choiceLabels = Enum.GetNames(type).Select(name => EnumLabel(type, name)).ToArray(), enabled };
             else if (property.Name == "SelectedCustomTheme")
                 yield return new { path, label = "Tema personalizado selecionado", kind = "enum", value = value ?? "", choices = new[] { "" }.Concat(((AppearanceViewModel)model).CustomThemes).ToArray() };
             else if (property.Name == "SelectedLanguage")

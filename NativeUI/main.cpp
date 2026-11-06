@@ -181,7 +181,7 @@ static json changes() {
     std::string page = snapshot["pages"][pageIndex]["id"];
     for (const auto& f : fields) {
         std::string kind = f.data["kind"];
-        if (kind == "command") continue;
+        if (kind == "command" || kind == "info" || !f.data.value("enabled",true)) continue;
         json value;
         if (kind == "bool") value = SendMessageW(f.control, BM_GETCHECK, 0, 0) == BST_CHECKED;
         else if (kind == "json") value = f.data["editedValue"];
@@ -287,6 +287,7 @@ static void layoutFields() {
         int y = f.y - scrollPosition;
         std::string kind = f.data["kind"];
         if (kind == "command") { MoveWindow(f.button, 12, y, width - 24, 38, TRUE); continue; }
+        if (kind == "info") { MoveWindow(f.label,12,y,width-24,76,TRUE);continue; }
         if (kind == "bool") {
             MoveWindow(f.control, 12, y, width - 24, 52, TRUE);
         } else {
@@ -320,7 +321,8 @@ static void renderPage(bool resetScroll = true) {
         Field f; f.data = data; f.y = y;
         auto label = wide(data["label"].get<std::string>());
         std::string kind = data["kind"];
-        if (kind == "command") f.button = control(panel, L"BUTTON", label, WS_TABSTOP | BS_PUSHBUTTON, 1000 + index);
+        if (kind == "info") f.label = control(panel,L"STATIC",label,SS_LEFT);
+        else if (kind == "command") f.button = control(panel, L"BUTTON", label, WS_TABSTOP | BS_PUSHBUTTON, 1000 + index);
         else if (kind == "bool") {
             f.control = control(panel, L"BUTTON", label, WS_TABSTOP | BS_AUTOCHECKBOX | BS_MULTILINE, 2000 + index);
             SendMessageW(f.control, BM_SETCHECK, data["value"].get<bool>() ? BST_CHECKED : BST_UNCHECKED, 0);
@@ -344,7 +346,8 @@ static void renderPage(bool resetScroll = true) {
                 SendMessageW(f.control, EM_SETLIMITTEXT, 32767, 0);
             }
         }
-        fields.push_back(f); y += kind == "command" ? 50 : kind == "bool" ? 64 : 84; ++index;
+        if(f.control && !data.value("enabled",true)) EnableWindow(f.control,FALSE);
+        fields.push_back(f); y += kind == "info" ? 90 : kind == "command" ? 50 : kind == "bool" ? 64 : 84; ++index;
     }
     contentHeight = y; layoutFields(); rebuilding = false;
 }
