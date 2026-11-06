@@ -1,13 +1,15 @@
 using System.Buffers.Binary;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Bloxstrap;
 
-// Small in-process adapter for the site's public search and Roblox PNG downloads.
+// Small in-process adapter for the site's public search and PNG preview assets.
 // No browser runtime, listening port, API key, JavaScript execution, or bulk crawl.
 internal sealed class SweezyCursorCatalog
 {
-    internal record Item(string Slug, string Name, bool Animated);
+    internal record Item(string Slug, string Name, bool Animated, string CursorImage, string PointerImage, int CursorX, int CursorY, int PointerX, int PointerY);
     internal record Assets(string Cursor, string Pointer);
     private readonly Dictionary<string, (DateTime Time, Item[] Items)> _searchCache = new();
     private static readonly HttpClient Client = CreateClient();
@@ -25,7 +27,7 @@ internal sealed class SweezyCursorCatalog
 
     private static bool Allowed(Uri uri) => uri.Scheme == "https" && uri.IsDefaultPort &&
         string.IsNullOrEmpty(uri.UserInfo) && (uri.Host == "sweezy-cursors.com" ||
-        uri.Host == "cdn.sweezy-cursors.com" || uri.Host.EndsWith(".r2.cloudflarestorage.com", StringComparison.OrdinalIgnoreCase));
+        uri.Host == "cdn.sweezy-cursors.com");
 
     private static async Task<byte[]> Read(Uri uri, int maximum)
     {
@@ -81,12 +83,21 @@ internal sealed class SweezyCursorCatalog
                 string slug = link.Groups["slug"].Value;
                 string name = config.GetProperty("name").GetString() ?? "Cursor sem nome";
                 if (!link.Success || !seen.Add(slug)) continue;
+                var cursor = config.GetProperty("cursor"); var pointer = config.GetProperty("pointer");
+                string cursorImage = cursor.GetProperty("path").GetString() ?? "";
+                string pointerImage = pointer.GetProperty("path").GetString() ?? "";
+                bool PublicImage(string address) => Uri.TryCreate(address, UriKind.Absolute, out var uri) &&
+                    Allowed(uri) && uri.Host == "cdn.sweezy-cursors.com" && uri.AbsolutePath.StartsWith("/cursor_packs/", StringComparison.Ordinal) && uri.AbsolutePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase);
+                if (!PublicImage(cursorImage) || !PublicImage(pointerImage)) continue;
+                int Offset(JsonElement asset, string key) => asset.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number) ? Math.Clamp(number, 0, 512) : 0;
                 items.Add(new(slug, name.Length > 200 ? name[..200] : name,
-                    config.TryGetProperty("isAnimated", out var animated) && animated.ValueKind == JsonValueKind.True));
+                    config.TryGetProperty("isAnimated", out var animated) && animated.ValueKind == JsonValueKind.True,
+                    cursorImage, pointerImage, Offset(cursor,"offsetX"), Offset(cursor,"offsetY"), Offset(pointer,"offsetX"), Offset(pointer,"offsetY")));
                 if (items.Count == 24) break;
             }
             catch (JsonException) { }
             catch (KeyNotFoundException) { }
+            catch (InvalidOperationException) { }
         }
         return items.ToArray();
     }
@@ -118,24 +129,38 @@ internal sealed class SweezyCursorCatalog
         _ = decoder.Frames[0].PixelWidth;
     }
 
+    internal static byte[] RobloxPng(byte[] bytes, int hotspotX, int hotspotY)
+    {
+        ValidatePng(bytes);
+        using var source = new MemoryStream(bytes);
+        var image = new PngBitmapDecoder(source, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+        double scale = 24.0 / Math.Max(image.PixelWidth, image.PixelHeight);
+        var visual = new DrawingVisual(); RenderOptions.SetBitmapScalingMode(visual, BitmapScalingMode.HighQuality);
+        using (var drawing = visual.RenderOpen())
+            drawing.DrawImage(image, new Rect(32 - Math.Clamp(hotspotX, 0, image.PixelWidth) * scale,
+                32 - Math.Clamp(hotspotY, 0, image.PixelHeight) * scale, image.PixelWidth * scale, image.PixelHeight * scale));
+        var canvas = new RenderTargetBitmap(64, 64, 96, 96, PixelFormats.Pbgra32); canvas.Render(visual);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(canvas));
+        using var result = new MemoryStream(); encoder.Save(result); return result.ToArray();
+    }
+
     public async Task<Assets> Preview(Item item)
     {
-        string root = Path.Combine(Paths.Temp, "Sweezy");
+        string root = Path.Combine(Paths.Temp, "Sweezy-v2");
         string directory = Path.Combine(root, item.Slug);
         Directory.CreateDirectory(directory);
-        async Task<string> Image(string kind, string name)
+        async Task<string> Image(string address, string name, int hotspotX, int hotspotY)
         {
             string file = Path.Combine(directory, name + ".png");
             if (File.Exists(file) && DateTime.UtcNow - File.GetLastWriteTimeUtc(file) < TimeSpan.FromHours(24))
             {
                 var cached = File.ReadAllBytes(file); ValidatePng(cached); return file;
             }
-            var bytes = await Read(new Uri($"https://sweezy-cursors.com/cursor/{item.Slug}/downloads/{kind}/"), 2_000_000);
-            ValidatePng(bytes);
+            var bytes = RobloxPng(await Read(new Uri(address), 2_000_000), hotspotX, hotspotY);
             File.WriteAllBytes(file, bytes);
             return file;
         }
-        var images = await Task.WhenAll(Image("roblox-cursor", "cursor"), Image("roblox-pointer", "pointer"));
+        var images = await Task.WhenAll(Image(item.CursorImage, "cursor", item.CursorX, item.CursorY), Image(item.PointerImage, "pointer", item.PointerX, item.PointerY));
         Directory.SetLastWriteTimeUtc(directory, DateTime.UtcNow);
         foreach (var old in new DirectoryInfo(root).EnumerateDirectories().OrderByDescending(d => d.LastWriteTimeUtc).Skip(16))
         {

@@ -8,7 +8,8 @@ internal static class CursorCatalogChecks
 {
     public static void Run()
     {
-        string json = "{\"cursorConfig\":{\"name\":\"Test & cursor\",\"isAnimated\":true}}";
+        string asset = "{\"path\":\"https://cdn.sweezy-cursors.com/cursor_packs/test/image.png\",\"offsetX\":2,\"offsetY\":3}";
+        string json = "{\"cursorConfig\":{\"name\":\"Test & cursor\",\"isAnimated\":true,\"cursor\":" + asset + ",\"pointer\":" + asset + "}}";
         string html = "<article data-cursor-pack-payload=\"" + WebUtility.HtmlEncode(json) +
             "\"><a href=\"/cursor/test-cursor/\">Test</a></article>";
         var results = SweezyCursorCatalog.ParseSearch(html);
@@ -25,9 +26,17 @@ internal static class CursorCatalogChecks
         {
             Paths.Initialize(root);
             string image = Path.Combine(root, "test.png");
-            var bitmap = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 64 * 4], 64 * 4);
+            var bitmap = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, Enumerable.Repeat((byte)255, 64 * 64 * 4).ToArray(), 64 * 4);
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using (var stream = File.Create(image)) encoder.Save(stream);
+            var converted = SweezyCursorCatalog.RobloxPng(File.ReadAllBytes(image), 0, 0);
+            using (var convertedStream = new MemoryStream(converted))
+            {
+                var decoded = new PngBitmapDecoder(convertedStream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames[0];
+                if (decoded.PixelWidth != 64 || decoded.PixelHeight != 64) throw new Exception("Roblox PNG dimensions are invalid.");
+                var pixels = new byte[64 * 64 * 4]; decoded.CopyPixels(pixels, 64 * 4, 0);
+                if (pixels[(40 * 64 + 40) * 4 + 3] == 0 || pixels[(8 * 64 + 8) * 4 + 3] != 0) throw new Exception("Cursor hotspot placement is invalid.");
+            }
             SweezyCursorCatalog.Install(new(image, image));
             string directory = Path.Combine(Paths.Modifications, "content", "textures", "Cursors", "KeyboardMouse");
             if (!File.ReadAllBytes(image).SequenceEqual(File.ReadAllBytes(Path.Combine(directory, "ArrowCursor.png"))) ||
