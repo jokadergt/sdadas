@@ -22,6 +22,8 @@ internal sealed class NativeUiBridge
     private Dictionary<string, Dictionary<string, string>> _labels = new();
     private bool _installed;
     private bool _dirty;
+    private string _notice = "";
+    private string _launchResult = "";
     private readonly Dictionary<string, string?> _diskHashes = new();
 
     public static void Start()
@@ -157,6 +159,9 @@ internal sealed class NativeUiBridge
     private object Snapshot() => new
     {
         ok = true, installed = _installed, dirty = _dirty || App.PendingSettingTasks.Count > 0,
+        notice = _notice, launchResult = _launchResult,
+        playerRunning = ExistingRoblox.IsRunning(LaunchMode.Player),
+        studioRunning = ExistingRoblox.IsRunning(LaunchMode.Studio),
         version = App.Version, bubbleSounds = App.Settings.Prop.BubbleSounds, theme = _installed ? App.Settings.Prop.Theme.GetFinal().ToString() : "Dark",
         pages = _models.Select(pair => new { id = pair.Key, title = _titles[pair.Key], fields = Fields(pair.Key, pair.Value).ToArray() }).ToArray()
     };
@@ -221,6 +226,8 @@ internal sealed class NativeUiBridge
         App.PendingSettingTasks.Clear();
         _dirty = false;
         FileCacheCleaner.StartIfEnabled();
+        _notice = ExistingRoblox.IsRunning(LaunchMode.Player) || ExistingRoblox.IsRunning(LaunchMode.Studio)
+            ? "Salvo • fonte/flags na próxima abertura do jogo" : "Configurações salvas";
     }
 
     private static string? DiskHash(string path) => File.Exists(path) ? MD5Hash.FromFile(path) : null;
@@ -240,6 +247,8 @@ internal sealed class NativeUiBridge
 
     private async Task<object> Handle(JsonElement request)
     {
+        _notice = "";
+        _launchResult = "";
         string op = request.GetProperty("op").GetString()!;
         if (op == "snapshot") return Snapshot();
         if (!_installed) throw new InvalidOperationException("Instale o motor original antes de editar configurações.");
@@ -248,6 +257,27 @@ internal sealed class NativeUiBridge
         {
             case "apply": break;
             case "save": await Save(); break;
+            case "launch":
+                var modeName = request.GetProperty("mode").GetString();
+                LaunchMode mode = modeName switch
+                {
+                    "Player" => LaunchMode.Player,
+                    "Studio" => LaunchMode.Studio,
+                    _ => throw new ArgumentException("Tipo de lançamento inválido")
+                };
+                await Save(); // The native launch buttons also commit pending edits.
+                if (ExistingRoblox.TryActivate(mode))
+                {
+                    _launchResult = "existing";
+                    _notice = "Instância já aberta • fonte/flags no próximo início";
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo(Paths.Process, mode == LaunchMode.Player ? "-player" : "-studio") { UseShellExecute = false })?.Dispose();
+                    _launchResult = "started";
+                    _notice = "Configurações salvas • iniciando o jogo";
+                }
+                break;
             case "command":
                 string page = request.GetProperty("page").GetString()!;
                 string name = request.GetProperty("path").GetString()!;

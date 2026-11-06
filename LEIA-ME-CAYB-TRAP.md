@@ -71,3 +71,11 @@ Botões, seletores, caixas de texto, navegação e cartões usam cantos arredond
 Na seção **Comportamento**, habilite **Limpar cache de arquivos em segundo plano** e salve. Ao iniciar Roblox/Studio, um processo auxiliar solicitará administrador pelo UAC. Se a autorização for negada, a limpeza não roda. Quando houver jogo aberto e uso de RAM de pelo menos 85%, o auxiliar libera o cache de arquivos do Windows, no máximo uma vez a cada cinco minutos; a primeira verificação que pode limpar ocorre após cinco minutos. Ele encerra após o jogo fechar ou a opção ser desativada, com até um minuto para perceber o fechamento e até 15 segundos para perceber a desativação.
 
 O recurso usa `SetSystemFileCacheSize(-1,-1,0)`: não limpa a lista standby inteira, não encerra programas, não reduz à força o working set do Roblox e não muda os limites permanentes do cache. O Windows pode preencher o cache novamente; limpar pode causar novas leituras do disco e não garante melhor desempenho. O teste de CI verifica a persistência da opção, mas não executa a limpeza privilegiada.
+
+## Reutilizar a instância aberta
+
+Os botões Roblox/Studio salvam as alterações automaticamente. Se já houver uma instância do produto na mesma sessão do Windows, o launcher tenta trazê-la para frente e não inicia outra. Há uma nova checagem imediatamente antes de iniciar o executável, para cobrir a espera por downloads/atualizações. Instâncias de outros usuários/sessões não são selecionadas.
+
+A limpeza de cache habilitada pode começar a acompanhar o jogo já aberto, mantendo a autorização de administrador, o limite de 85% e o intervalo mínimo já descritos. Fonte, mods de arquivos e FastFlags continuam preparados nos arquivos para a próxima inicialização: este mecanismo não injeta código ou valores na memória do Roblox e não recarrega essas configurações na sessão atual. O launcher mantém a sessão existente aberta e não força reinicialização.
+
+O teste Windows usa um processo de teste próprio com o nome do executável do Player para verificar detecção, reutilização e salvamento automático, sem iniciar ou baixar Roblox real. Isso não testa uma sessão online do Roblox.

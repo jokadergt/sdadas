@@ -558,6 +558,14 @@ namespace Bloxstrap
         {
             const string LOG_IDENT = "Bootstrapper::StartRoblox";
 
+            // Recheck after downloads and the bootstrapper mutex wait.
+            if (ExistingRoblox.TryActivate(_launchMode))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Roblox already running; duplicate launch skipped");
+                FileCacheCleaner.StartIfEnabled();
+                return;
+            }
+
             SetStatus(Strings.Bootstrapper_Status_Starting);
 
             var startInfo = new ProcessStartInfo()

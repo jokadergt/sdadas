@@ -20,6 +20,7 @@ def main():
     except FileNotFoundError:
         pass
     process = None
+    fake_game = None
     with tempfile.TemporaryDirectory(prefix="cayb-bridge-test-") as temp:
         try:
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, KEY) as key:
@@ -92,6 +93,22 @@ def main():
             request({"op": "apply", "changes": [
                 {"page": "Appearance", "path": "Dialog", "value": "InvalidStyle"}
             ]}, ok=False)
+            # Test reuse/autosave with a small owned fixture, never with a real game.
+            fake_path = Path(temp) / "RobloxPlayerBeta.exe"
+            subprocess.run(["g++", str(Path(__file__).with_name("test_existing_instance.cpp")),
+                            "-municode", "-mwindows", "-static", "-o", str(fake_path)], check=True, timeout=60)
+            fake_game = subprocess.Popen([str(fake_path)])
+            for _ in range(3):
+                reused = request({"op":"launch", "mode":"Player", "changes":[
+                    {"page":"Appearance", "path":"Title", "value":"Saved without relaunch"}]})
+                assert reused["launchResult"] == "existing", reused
+                assert reused["playerRunning"] is True
+                assert fake_game.poll() is None
+            assert json.loads((Path(temp)/"Settings.json").read_text())["BootstrapperTitle"] == "Saved without relaunch"
+            request({"op":"launch", "mode":"Invalid", "changes":[]}, ok=False)
+            fake_game.terminate()
+            fake_game.wait(timeout=15)
+            settings = json.loads((Path(temp)/"Settings.json").read_text())
             # External edits must not be overwritten silently.
             path = Path(temp) / "Settings.json"
             settings["ConfirmLaunches"] = False
@@ -109,6 +126,9 @@ def main():
 
             print("Bridge integration checks passed.")
         finally:
+            if fake_game and fake_game.poll() is None:
+                fake_game.terminate()
+                fake_game.wait(timeout=15)
             if process and process.poll() is None:
                 process.terminate()
                 process.wait(timeout=15)

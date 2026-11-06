@@ -467,6 +467,8 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         SendMessageW(nav, LB_SETCURSEL, pageIndex, 0); rebuilding = false;
         renderPage(); setBusy(false);
         SetWindowTextW(status, !snapshot.value("installed", false) ? L"Motor presente; instalação necessária." : snapshot.value("dirty", false) ? L"Alterações pendentes — clique em Salvar" : L"Conectado ao motor original");
+        auto notice = snapshot.value("notice", std::string{});
+        if (!notice.empty()) SetWindowTextW(status, wide(notice).c_str());
         return 0;
     }
     if (msg == RestartMessage) {
@@ -486,8 +488,10 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
                 std::thread([old]() { if (old) WaitForSingleObject(old, INFINITE); PostMessageW(windowHandle, RestartMessage, 0, 0); }).detach();
             } else runEngine(L"-nolaunch", true);
         } else if (!busy && id == 10) send({{"op", "save"}, {"changes", changes()}});
-        else if (!busy && id == 12) runEngine(L"-player", false);
-        else if (!busy && id == 13) runEngine(L"-studio", false);
+        else if (!busy && (id == 12 || id == 13)) {
+            if (engineProcess) AllowSetForegroundWindow(GetProcessId(engineProcess));
+            send({{"op", "launch"}, {"mode", id == 12 ? "Player" : "Studio"}, {"changes", changes()}});
+        }
         else if (!busy && id == 1 && HIWORD(wp) == LBN_SELCHANGE) {
             requestedPage = (int)SendMessageW(nav, LB_GETCURSEL, 0, 0);
             send({{"op", "apply"}, {"changes", changes()}});

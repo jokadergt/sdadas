@@ -222,6 +222,14 @@ namespace Bloxstrap
             if (launchMode == LaunchMode.None)
                 throw new InvalidOperationException("No Roblox launch mode set");
 
+            if (ExistingRoblox.TryActivate(launchMode))
+            {
+                App.Logger.WriteLine(LOG_IDENT, "Reusing existing Roblox instance; launch skipped");
+                FileCacheCleaner.StartIfEnabled();
+                App.SoftTerminate();
+                return;
+            }
+
             if (!File.Exists(Path.Combine(Paths.System, "mfplat.dll")))
             {
                 Frontend.ShowMessageBox(Strings.Bootstrapper_WMFNotFound, MessageBoxImage.Error);
