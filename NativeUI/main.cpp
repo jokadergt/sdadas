@@ -554,7 +554,14 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         setBusy(false);
         if (!reply->value("ok", false)) {
             if (reply->value("disconnected", false)) { bridgeAlive = false; SetWindowTextW(status, L"Conexão encerrada — use Reconectar"); }
-            else { message(reply->value("error", "Erro desconhecido")); requestedPage = pageIndex; SendMessageW(nav, LB_SETCURSEL, pageIndex, 0); }
+            else {
+                message(reply->value("error", "Não foi possível concluir a operação."));
+                requestedPage = pageIndex; SendMessageW(nav, LB_SETCURSEL, pageIndex, 0);
+                if(cursorPage()) {
+                    auto query=text(cursorQuery); renderPage(false); SetWindowTextW(cursorQuery,query.c_str());
+                }
+                SetWindowTextW(status,L"Operação não concluída. Tente novamente.");
+            }
             return 0;
         }
         snapshot = *reply;
