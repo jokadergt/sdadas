@@ -233,7 +233,7 @@ static LRESULT CALLBACK CursorPreviewProc(HWND h,UINT msg,WPARAM wp,LPARAM lp) {
             int x=10+n*(r.right-20)/2, y=88;
             if(!paths[n].empty() && imagingToken) {
                 Gdiplus::Graphics graphics(dc);Gdiplus::Image image(wide(paths[n]).c_str());
-                if(image.GetLastStatus()==Gdiplus::Ok) graphics.DrawImage(&image,x+std::max(0,((r.right-20)/2-64)/2),y,64,64);
+                if(image.GetLastStatus()==Gdiplus::Ok) graphics.DrawImage(&image,x+std::max(0,(int)((r.right-20)/2-64)/2),y,64,64);
             }
             RECT caption{x,158,x+(r.right-20)/2,190};DrawTextW(dc,n==0?L"Cursor":L"Ponteiro",-1,&caption,DT_CENTER|DT_SINGLELINE);
         }
@@ -247,7 +247,7 @@ static void renderCursors() {
     auto add=[](const wchar_t* cls,const std::wstring& caption,DWORD style,int id){HWND h=control(panel,cls,caption,style,id);cursorWidgets.push_back(h);return h;};
     SetWindowTextW(heading,L"Cursores para Roblox");
     cursorQuery=add(L"EDIT",wide(data.value("query",std::string{})),WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,4001);
-    SendMessageW(cursorQuery,EM_SETCUEBANNER,TRUE,(LPARAM)L"Ex.: Minecraft, gato, anime…");SendMessageW(cursorQuery,EM_SETLIMITTEXT,80,0);
+    SendMessageW(cursorQuery,EM_SETCUEBANNER,TRUE,(LPARAM)L"Ex.: Minecraft, anime, cat…");SendMessageW(cursorQuery,EM_SETLIMITTEXT,80,0);
     add(L"BUTTON",L"Pesquisar",WS_TABSTOP,4002);
     add(L"STATIC",L"Pesquise no Sweezy Cursors. Selecione uma prévia e clique em Usar no Roblox.",SS_LEFT,4008);
     cursorResults=add(L"LISTBOX",L"",WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY|LBS_OWNERDRAWFIXED|LBS_HASSTRINGS|LBS_NOINTEGRALHEIGHT,4003);
@@ -302,7 +302,8 @@ static void layoutFields() {
 }
 static void renderPage(bool resetScroll = true) {
     rebuilding = true;
-    for(HWND h:cursorWidgets)DestroyWindow(h);cursorWidgets.clear();
+    for(HWND h:cursorWidgets) { DestroyWindow(h); }
+    cursorWidgets.clear();
     for (auto& f : fields) { if (f.label) DestroyWindow(f.label); if (f.control) DestroyWindow(f.control); if (f.button) DestroyWindow(f.button); }
     fields.clear();
     if (resetScroll) scrollPosition = 0;
