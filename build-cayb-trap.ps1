@@ -11,7 +11,7 @@ Push-Location NativeUI
 try {
     windres app.rc -O coff -o app.res.o
     if ($LASTEXITCODE -ne 0) { throw 'Falha nos recursos da interface.' }
-    g++ main.cpp app.res.o -std=c++17 -O2 -Wall -Wextra -Wno-missing-field-initializers -municode -mwindows -static -lcomctl32 -lshell32 -ldwmapi -luxtheme -lwinmm -o '../dist-native/cayb trap.exe'
+    g++ main.cpp app.res.o -std=c++17 -O2 -Wall -Wextra -Wno-missing-field-initializers -municode -mwindows -static -lcomctl32 -lshell32 -ldwmapi -luxtheme -lwinmm -lgdiplus -o '../dist-native/cayb trap.exe'
     if ($LASTEXITCODE -ne 0) { throw 'Falha na compilacao C++.' }
 } finally { Pop-Location }
 dotnet publish Bloxstrap/Bloxstrap.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/engine

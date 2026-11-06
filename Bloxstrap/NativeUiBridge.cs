@@ -15,11 +15,15 @@ internal sealed class NativeUiBridge
     private readonly Dictionary<string, string> _titles = new()
     {
         ["Integrations"] = "Integrações", ["Behaviour"] = "Comportamento",
-        ["Mods"] = "Mods", ["FastFlags"] = "FastFlags",
+        ["Mods"] = "Modificações", ["Cursors"] = "Cursores", ["FastFlags"] = "FastFlags",
         ["Appearance"] = "Aparência", ["Shortcuts"] = "Atalhos",
         ["Bloxstrap"] = "cayb trap"
     };
     private Dictionary<string, Dictionary<string, string>> _labels = new();
+    private readonly SweezyCursorCatalog _catalog = new();
+    private SweezyCursorCatalog.Item[] _cursorItems = Array.Empty<SweezyCursorCatalog.Item>();
+    private SweezyCursorCatalog.Assets? _cursorPreview;
+    private string _cursorQuery = "", _cursorSelected = "";
     private bool _installed;
     private bool _dirty;
     private string _notice = "";
@@ -80,6 +84,7 @@ internal sealed class NativeUiBridge
         _models["Integrations"] = new IntegrationsViewModel();
         _models["Behaviour"] = new BehaviourViewModel();
         _models["Mods"] = new ModsViewModel();
+        _models["Cursors"] = new object();
         _models["FastFlags"] = new FastFlagsViewModel();
         _models["Appearance"] = new AppearanceViewModel(new Page());
         _models["Shortcuts"] = new ShortcutsViewModel();
@@ -94,8 +99,31 @@ internal sealed class NativeUiBridge
             throw new InvalidDataException($"Arquivo inválido: {path}");
     }
 
+    private static string EnumLabel(Type type, string name)
+    {
+        if (name == "Default") return type == typeof(Theme) ? "Seguir o Windows" : "Automático / padrão";
+        return name switch
+        {
+            "Light" => "Claro", "Dark" => "Escuro", "Production" => "Produção",
+            "Staging" => "Homologação", "Dev" => "Desenvolvimento", "DevPizza" => "Desenvolvimento (Pizza)",
+            "DevMatt" => "Desenvolvimento (Matt)", "Local" => "Local",
+            "Windows11" => "Windows 11", "Windows10" => "Windows 10", "Windows8" => "Windows 8",
+            "From2006" => "Roblox 2006", "From2013" => "Roblox 2013",
+            "x1" => "1×", "x2" => "2×", "x4" => "4×",
+            "Level0" => "Nível 0", "Level1" => "Nível 1", "Level2" => "Nível 2", "Level3" => "Nível 3",
+            "IconBloxstrap" => "Capivara", "IconCustom" => "Ícone personalizado",
+            "IconBloxstrapClassic" => "Bloxstrap clássico", "CustomDialog" => "Personalizado",
+            "ProgressDialog" => "Barra de progresso", "FluentDialog" => "Fluent",
+            "ClassicFluentDialog" => "Fluent clássico", "FluentAeroDialog" => "Fluent Aero",
+            "VistaDialog" => "Windows Vista", "LegacyDialog2008" => "Clássico 2008", "LegacyDialog2011" => "Clássico 2011",
+            _ => name.StartsWith("Icon", StringComparison.Ordinal) ? "Roblox " + name[4..] : Regex.Replace(name, "([a-z])([A-Z])", "$1 $2")
+        };
+    }
+
     private string Label(string page, string path)
     {
+        if (page == "Mods" && path == "ManageCustomFontCommand")
+            return string.IsNullOrEmpty(((ModsViewModel)_models[page]).TextFontTask.NewState) ? "Escolher fonte personalizada" : "Remover fonte personalizada";
         if (_labels.TryGetValue(page, out var labels) && labels.TryGetValue(path, out var label)) return label;
         return Regex.Replace(path.Replace(".NewState", "").Replace("Command", "").Replace("Task", ""), "([a-z])([A-Z])", "$1 $2");
     }
@@ -112,11 +140,12 @@ internal sealed class NativeUiBridge
 
     private IEnumerable<object> Fields(string page, object model)
     {
+        if (page == "Cursors") yield break;
         foreach (var property in model.GetType().GetProperties())
         {
             // Collections/selection indexes are represented by native JSON editors or selectors below.
             if (property.Name is "SelectedCustomIntegration" or "SelectedCustomIntegrationIndex" or
-                "SelectedCustomThemeIndex" or "Icons" or "UpdateCheckingEnabled") continue;
+                "SelectedCustomThemeIndex" or "Icons" or "UpdateCheckingEnabled" or "ConfirmLaunches" or "TextFontTask") continue;
             object? value = property.GetValue(model);
             if (value is ICommand)
             {
@@ -137,7 +166,7 @@ internal sealed class NativeUiBridge
             if (type == typeof(bool))
                 yield return new { path, label = Label(page, path), kind = "bool", value };
             else if (type.IsEnum)
-                yield return new { path, label = Label(page, path), kind = "enum", value = value?.ToString(), choices = Enum.GetNames(type) };
+                yield return new { path, label = Label(page, path), kind = "enum", value = value?.ToString(), choices = Enum.GetNames(type), choiceLabels = Enum.GetNames(type).Select(name => EnumLabel(type, name)).ToArray() };
             else if (property.Name == "SelectedCustomTheme")
                 yield return new { path, label = "Tema personalizado selecionado", kind = "enum", value = value ?? "", choices = new[] { "" }.Concat(((AppearanceViewModel)model).CustomThemes).ToArray() };
             else if (property.Name == "SelectedLanguage")
@@ -162,6 +191,10 @@ internal sealed class NativeUiBridge
         notice = _notice, launchResult = _launchResult,
         playerRunning = ExistingRoblox.IsRunning(LaunchMode.Player),
         studioRunning = ExistingRoblox.IsRunning(LaunchMode.Studio),
+        cursorCatalog = new { query = _cursorQuery, selected = _cursorSelected,
+            results = _cursorItems.Select(item => new { slug = item.Slug, name = item.Name, animated = item.Animated }).ToArray(),
+            cursorPreview = _cursorPreview?.Cursor ?? "", pointerPreview = _cursorPreview?.Pointer ?? "",
+            installedName = App.State.Prop.SweezyCursorName },
         version = App.Version, bubbleSounds = App.Settings.Prop.BubbleSounds, theme = _installed ? App.Settings.Prop.Theme.GetFinal().ToString() : "Dark",
         pages = _models.Select(pair => new { id = pair.Key, title = _titles[pair.Key], fields = Fields(pair.Key, pair.Value).ToArray() }).ToArray()
     };
@@ -255,6 +288,35 @@ internal sealed class NativeUiBridge
         if (request.TryGetProperty("changes", out var changes)) Apply(changes);
         switch (op)
         {
+            case "cursor.search":
+                _cursorQuery = request.GetProperty("query").GetString() ?? "";
+                _cursorItems = await _catalog.Search(_cursorQuery);
+                _cursorSelected = ""; _cursorPreview = null;
+                _notice = _cursorItems.Length == 0 ? "Nenhum cursor encontrado. Tente outro termo." : $"{_cursorItems.Length} resultados do Sweezy — selecione uma prévia";
+                break;
+            case "cursor.preview":
+            case "cursor.install":
+                string slug = request.GetProperty("slug").GetString() ?? "";
+                var item = _cursorItems.FirstOrDefault(item => item.Slug == slug) ?? throw new ArgumentException("Pesquise e selecione um resultado válido antes de continuar.");
+                _cursorPreview = await _catalog.Preview(item);
+                _cursorSelected = item.Slug;
+                if (op == "cursor.install")
+                {
+                    await Save();
+                    SweezyCursorCatalog.Install(_cursorPreview);
+                    App.State.Prop.SweezyCursorSlug = item.Slug; App.State.Prop.SweezyCursorName = item.Name;
+                    App.State.Save(); Verify(App.State); RememberDisk();
+                    _models["Mods"] = new ModsViewModel();
+                    _notice = "Cursor preparado — será aplicado na próxima abertura do Roblox";
+                }
+                else _notice = "Prévia estática pronta. Clique em Usar no Roblox para aplicar.";
+                break;
+            case "cursor.reset":
+                await Save(); SweezyCursorCatalog.Reset();
+                App.State.Prop.SweezyCursorSlug = ""; App.State.Prop.SweezyCursorName = "";
+                App.State.Save(); Verify(App.State); RememberDisk(); _models["Mods"] = new ModsViewModel();
+                _notice = "Cursor padrão preparado para a próxima abertura do Roblox";
+                break;
             case "apply": break;
             case "save": await Save(); break;
             case "launch":

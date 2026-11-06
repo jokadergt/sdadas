@@ -14,6 +14,8 @@ KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\cayb trap"
 
 def main():
     engine = Path(sys.argv[1]).resolve()
+    checked = subprocess.run([str(engine), "-selftest-cursors"], capture_output=True, text=True, timeout=60)
+    assert checked.returncode == 0, checked.stderr
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KEY):
             raise RuntimeError("Existing installation; refusing to touch it")
@@ -52,6 +54,29 @@ def main():
 
             state = receive()
             assert state["installed"]
+            request({"op":"cursor.preview", "slug":"../../outside"}, ok=False)
+            request({"op":"cursor.search", "query":""}, ok=False)
+            # A single bounded public search and the selected pair of Roblox PNGs.
+            process.stdin.write(json.dumps({"op":"cursor.search", "query":"minecraft"}) + "\n")
+            process.stdin.flush()
+            live = replies.get(timeout=60)
+            if live.get("ok"):
+                catalog = live["cursorCatalog"]
+                assert 0 < len(catalog["results"]) <= 24
+                slug = catalog["results"][0]["slug"]
+                preview = request({"op":"cursor.preview", "slug":slug})
+                assert Path(preview["cursorCatalog"]["cursorPreview"]).read_bytes().startswith(b"\x89PNG")
+                installed = request({"op":"cursor.install", "slug":slug})
+                assert installed["cursorCatalog"]["installedName"]
+                assert (Path(temp)/"Modifications/content/textures/Cursors/KeyboardMouse/ArrowCursor.png").is_file()
+                request({"op":"cursor.reset"})
+                assert not (Path(temp)/"Modifications/content/textures/Cursors/KeyboardMouse/ArrowCursor.png").exists()
+                print("Sweezy live search, PNG preview, install and reset passed.")
+            else:
+                error = live.get("error", "")
+                assert any(text in error for text in ["limitou o acesso", "Não foi possível conectar", "demorou para responder", "HTTP 5"]), live
+                print("Sweezy live network check unavailable: " + error)
+
             custom_font = Path(temp) / "Modifications/content/fonts/CustomFont.ttf"
             assert custom_font.is_file()
             import hashlib
@@ -62,16 +87,16 @@ def main():
             assert len(expected_flags) == 18
             assert json.loads(flags_path.read_text()) == expected_flags
             pages = {p["id"]: p for p in state["pages"]}
-            assert set(pages) == {"Integrations", "Behaviour", "Mods", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap"}
+            assert set(pages) == {"Integrations", "Behaviour", "Mods", "Cursors", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap"}
             assert any(f["path"] == "CursorTypeTask.NewState" for f in pages["Mods"]["fields"])
             request({"op": "save", "changes": [
-                {"page": "Behaviour", "path": "ConfirmLaunches", "value": True},
+                {"page": "Behaviour", "path": "BackgroundUpdates", "value": True},
                 {"page": "Appearance", "path": "Title", "value": "Capybara test"},
                 {"page": "Mods", "path": "OldCharacterSoundsTask.NewState", "value": True},
                 {"page": "FastFlags", "path": "$flags", "value": {"FFlagCaybBridgeTest": "True"}},
             ]})
             settings = json.loads((Path(temp) / "Settings.json").read_text(encoding="utf-8-sig"))
-            assert settings["ConfirmLaunches"] is True
+            assert settings["BackgroundUpdatesEnabled"] is True
             assert settings["BootstrapperTitle"] == "Capybara test"
             assert json.loads(flags_path.read_text()) == expected_flags, "Unlisted flags were not removed"
             assert settings["BackgroundFileCacheCleaner"] is False
@@ -111,10 +136,10 @@ def main():
             settings = json.loads((Path(temp)/"Settings.json").read_text())
             # External edits must not be overwritten silently.
             path = Path(temp) / "Settings.json"
-            settings["ConfirmLaunches"] = False
+            settings["BackgroundUpdatesEnabled"] = False
             path.write_text(json.dumps(settings), encoding="utf-8")
             request({"op": "save", "changes": []}, ok=False)
-            assert json.loads(path.read_text())["ConfirmLaunches"] is False
+            assert json.loads(path.read_text())["BackgroundUpdatesEnabled"] is False
             process.stdin.close()
             assert process.wait(timeout=30) == 0
             # Removing the font through Mods must not be undone at the next startup.

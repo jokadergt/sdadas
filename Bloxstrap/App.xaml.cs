@@ -290,6 +290,13 @@ namespace Bloxstrap
 
             LaunchSettings = new LaunchSettings(e.Args);
 
+            if (e.Args.Length == 1 && e.Args[0] == "-selftest-cursors")
+            {
+                try { CursorCatalogChecks.Run(); Current.Shutdown(0); }
+                catch (Exception ex) { Console.Error.WriteLine(ex); Current.Shutdown(1); }
+                return;
+            }
+
             if (e.Args.Length == 1 && e.Args[0] == "-cachecleaner")
             {
                 FileCacheCleaner.Run();

@@ -79,3 +79,15 @@ Os botões Roblox/Studio salvam as alterações automaticamente. Se já houver u
 A limpeza de cache habilitada pode começar a acompanhar o jogo já aberto, mantendo a autorização de administrador, o limite de 85% e o intervalo mínimo já descritos. Fonte, mods de arquivos e FastFlags continuam preparados nos arquivos para a próxima inicialização: este mecanismo não injeta código ou valores na memória do Roblox e não recarrega essas configurações na sessão atual. O launcher mantém a sessão existente aberta e não força reinicialização.
 
 O teste Windows usa um processo de teste próprio com o nome do executável do Player para verificar detecção, reutilização e salvamento automático, sem iniciar ou baixar Roblox real. Isso não testa uma sessão online do Roblox.
+
+## Cursores do Sweezy
+
+A seção **Cursores** permite pesquisar no Sweezy Cursors, selecionar uma prévia e clicar em **Usar no Roblox**. A integração usa uma API interna por JSON no canal existente entre interface e motor; não instala servidor HTTP, navegador embutido nem processo permanente adicional.
+
+A API consulta a busca pública `/search/?s=...`, mantém até oito pesquisas em cache por cinco minutos e retorna até 24 resultados por pesquisa. Refine o termo se precisar de outros resultados. Somente a prévia selecionada baixa as duas imagens PNG próprias para Roblox. Cada imagem tem limite de 2 MB e 512 × 512 pixels; até 16 pares ficam no cache temporário por até 24 horas. O cliente não executa scripts, anúncios, extensões, arquivos EXE, CUR ou ANI do site.
+
+**Usar no Roblox** prepara `ArrowCursor.png` e `ArrowFarCursor.png` na pasta de modificações do Bloxstrap. Feche o jogo e abra-o pelo cayb trap para aplicar. Se já houver uma sessão aberta, ela permanece aberta e o cursor fica preparado para o próximo início. Experiências que definem o próprio cursor podem substituí-lo. Cursores animados do site usam os PNGs estáticos fornecidos para Roblox; não há promessa de animação no jogo.
+
+**Restaurar padrão** remove essas substituições para que o mecanismo original restaure os arquivos padrão na próxima abertura. Substituições anteriores ficam em `Backups/Cursors`. As criações, nomes e direitos pertencem aos autores/Sweezy; o botão **Ver no Sweezy** abre a página original. A integração não é afiliada ao site e não contorna restrições de acesso: se houver bloqueio, limite de requisições ou mudança no HTML, o aplicativo mostra uma mensagem em português.
+
+A busca pública e os downloads usados foram verificados em 06/11/2026. O build testa análise do HTML, validação PNG, instalação/restauração em pasta temporária e tenta uma pesquisa e download reais. Indisponibilidade de rede do serviço é reportada separadamente, sem fingir resultados. O funcionamento visual dentro de uma sessão real do Roblox não é testado no CI.

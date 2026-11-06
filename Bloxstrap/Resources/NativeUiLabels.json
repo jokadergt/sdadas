@@ -1,49 +1,55 @@
 {
   "Appearance": {
     "Themes": "Tema Global",
-    "Theme": "Tema Global",
+    "Theme": "Tema do aplicativo",
     "Languages": "Idioma",
     "SelectedLanguage": "Idioma",
-    "PreviewBootstrapperCommand": "Pré-visualização",
-    "AddCustomThemeCommand": "Novo",
-    "DeleteCustomThemeCommand": "Deletar",
-    "RenameCustomThemeCommand": "Renomear",
-    "EditCustomThemeCommand": "Editar",
-    "ExportCustomThemeCommand": "Exportar",
+    "PreviewBootstrapperCommand": "Visualizar janela de inicialização",
+    "AddCustomThemeCommand": "Adicionar tema",
+    "DeleteCustomThemeCommand": "Excluir tema",
+    "RenameCustomThemeCommand": "Renomear tema",
+    "EditCustomThemeCommand": "Editar tema",
+    "ExportCustomThemeCommand": "Exportar tema",
     "Icons": "Ícone",
-    "Icon": "Ícone",
+    "Icon": "Ícone da janela de inicialização",
     "ImageSource": "Ícone",
     "IconType": "Ícone",
-    "BrowseCustomIconLocationCommand": "Pesquisar"
+    "BrowseCustomIconLocationCommand": "Escolher ícone",
+    "Dialog": "Estilo da janela de inicialização",
+    "Title": "Título da janela de inicialização",
+    "CustomIconLocation": "Caminho do ícone personalizado",
+    "SelectedCustomThemeName": "Nome do tema personalizado"
   },
   "Shortcuts": {
-    "ExtractIconsTask.NewState": "Extrair ícones do Roblox para a pasta",
-    "DesktopIconTask.NewState": "Ícone da Área de Trabalho",
-    "StartMenuIconTask.NewState": "Ícone do Menu Iniciar",
-    "PlayerIconTask.NewState": "Iniciar o Roblox",
-    "StudioIconTask.NewState": "Iniciar o Roblox Studio",
-    "SettingsIconTask.NewState": "Configurações do cayb trap"
+    "ExtractIconsTask.NewState": "Extrair ícones do Roblox",
+    "DesktopIconTask.NewState": "Atalho do cayb trap na área de trabalho",
+    "StartMenuIconTask.NewState": "Atalho do cayb trap no menu Iniciar",
+    "PlayerIconTask.NewState": "Atalho para jogar Roblox",
+    "StudioIconTask.NewState": "Atalho para abrir Roblox Studio",
+    "SettingsIconTask.NewState": "Atalho para as configurações do cayb trap"
   },
   "Integrations": {
     "ActivityTrackingEnabled": "Ativar rastreamento de atividades",
     "InnerContent.IsChecked": "Consultar Localização do Servidor",
-    "ShowServerDetailsEnabled": "Consultar Localização do Servidor",
-    "DisableAppPatchEnabled": "Não sair para o aplicativo do Roblox",
-    "DiscordActivityEnabled": "Mostrar atividade de jogo",
-    "DiscordActivityJoinEnabled": "Permitir a entrada de pessoas em seu jogo",
-    "DiscordAccountOnProfile": "Mostrar conta do Roblox",
+    "ShowServerDetailsEnabled": "Mostrar detalhes do servidor",
+    "DisableAppPatchEnabled": "Fechar o Roblox ao sair da experiência",
+    "DiscordActivityEnabled": "Mostrar atividade no Discord",
+    "DiscordActivityJoinEnabled": "Exibir botão para entrar no jogo pelo Discord",
+    "DiscordAccountOnProfile": "Mostrar conta do Roblox no Discord",
     "AddIntegrationCommand": "Novo",
     "DeleteIntegrationCommand": "Deletar",
     "BrowseIntegrationLocationCommand": "Pesquisar"
   },
   "Bloxstrap": {
     "UpdateCheckingEnabled": "Atualizar o Bloxstrap automaticamente",
-    "AnalyticsEnabled": "Habilitar o envio de análises",
+    "AnalyticsEnabled": "Enviar dados de diagnóstico",
     "WebEnvironmentVisibility": "Web environment",
     "WebEnvironments": "Web environment",
-    "WebEnvironment": "Web environment",
-    "ExportDataCommand": "Exportar",
-    "BubbleSounds": "Som de bolha nos cliques"
+    "WebEnvironment": "Ambiente do serviço",
+    "ExportDataCommand": "Exportar dados",
+    "BubbleSounds": "Som de bolha nos cliques",
+    "ShouldExportConfig": "Incluir configurações na exportação",
+    "ShouldExportLogs": "Incluir registros na exportação"
   },
   "Bootstrapper": {
     "ConfirmLaunches": "Pedir confirmação ao abrir outra janela do Roblox",
@@ -52,25 +58,25 @@
     "ForceRobloxReinstallation": "Forçar reinstalação do Roblox"
   },
   "FastFlags": {
-    "UseFastFlagManager": "Permitir que Bloxstrap gerencie as Fast Flags",
+    "UseFastFlagManager": "Aplicar FastFlags ao iniciar o Roblox",
     "MSAALevels.Keys": "Qualidade antisserilhamento (MSAA)",
-    "SelectedMSAALevel": "Qualidade antisserilhamento (MSAA)",
-    "FixDisplayScaling": "Preserve a qualidade de renderização com o dimensionamento da tela",
+    "SelectedMSAALevel": "Suavização de bordas (MSAA)",
+    "FixDisplayScaling": "Preservar nitidez com o dimensionamento da tela",
     "TextureQualities.Keys": "Qualidade da textura",
-    "SelectedTextureQuality": "Qualidade da textura",
-    "ResetConfiguration": "Redefinir tudo para os padrões",
+    "SelectedTextureQuality": "Qualidade das texturas",
+    "ResetConfiguration": "Redefinir FastFlags ao salvar",
     "OpenFastFlagEditorCommand": "Editor de Fast Flag",
     "AutomaticAllowedFastFlags": "Preset automático — 18 flags da lista pública (05/11/2026)"
   },
   "Mods": {
-    "OpenModsFolderCommand": "Abrir pasta de mods",
-    "OpenCompatSettingsCommand": "Gerenciar configurações de compatibilidade",
+    "OpenModsFolderCommand": "Abrir pasta de modificações",
+    "OpenCompatSettingsCommand": "Abrir opções de compatibilidade do Roblox",
     "CursorTypeTask.Selections": "Ponteiro do mouse",
-    "CursorTypeTask.NewState": "Ponteiro do mouse",
+    "CursorTypeTask.NewState": "Cursores clássicos (personalizados: seção Cursores)",
     "OldAvatarBackgroundTask.NewState": "Usar fundo antigo do editor de avatar",
-    "OldCharacterSoundsTask.NewState": "Emular sons de personagem antigos",
+    "OldCharacterSoundsTask.NewState": "Usar sons antigos do personagem",
     "EmojiFontTask.Selections": "Tipo de emoji favorito",
-    "EmojiFontTask.NewState": "Tipo de emoji favorito",
+    "EmojiFontTask.NewState": "Estilo dos emojis",
     "ManageCustomFontCommand": "Remover fonte aplicada",
     "ChooseCustomFontVisibility": "Usar fontes personalizadas",
     "DeleteCustomFontVisibility": "Usar fontes personalizadas"
@@ -80,6 +86,8 @@
     "Value": "Valor"
   },
   "Behaviour": {
-    "BackgroundFileCacheCleaner": "Limpar cache de arquivos em segundo plano (RAM ≥85%, administrador)"
+    "BackgroundFileCacheCleaner": "Limpar cache de arquivos em segundo plano (RAM ≥85%, administrador)",
+    "BackgroundUpdates": "Atualizar o Roblox em segundo plano",
+    "ForceRobloxReinstallation": "Reinstalar o Roblox na próxima abertura"
   }
 }

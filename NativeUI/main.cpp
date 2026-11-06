@@ -13,6 +13,8 @@
 #include <dwmapi.h>
 #include <uxtheme.h>
 #include <mmsystem.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #include <string>
 #include <vector>
 #include <thread>
@@ -38,6 +40,9 @@ static constexpr UINT EngineReplyMessage = WM_APP + 1;
 static constexpr UINT RestartMessage = WM_APP + 2;
 struct Field { json data; HWND label = nullptr, control = nullptr, button = nullptr; int y = 0; };
 static std::vector<Field> fields;
+static std::vector<HWND> cursorWidgets;
+static HWND cursorQuery, cursorResults, cursorPreviewBox;
+static ULONG_PTR imagingToken = 0;
 
 static std::wstring wide(const std::string& value) {
     if (value.empty()) return {};
@@ -90,6 +95,11 @@ static bool drawButton(LPARAM lp) {
 }
 static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
     if (msg == WM_SIZE) roundControl(h);
+    if (msg == WM_KEYDOWN && wp == VK_RETURN && GetDlgCtrlID(h) == 4001) {
+        HWND parent = GetParent(h);
+        SendMessageW(parent, WM_COMMAND, MAKEWPARAM(4002, BN_CLICKED), (LPARAM)GetDlgItem(parent, 4002));
+        return 0;
+    }
     if (msg == WM_NCDESTROY) RemoveWindowSubclass(h, RoundedControlProc, 1);
     bool toggle = (GetWindowLongPtrW(h, GWL_STYLE) & BS_TYPEMASK) == BS_AUTOCHECKBOX;
     wchar_t className[32]{}; GetClassNameW(h, className, 32);
@@ -153,14 +163,14 @@ static std::wstring quote(const std::wstring& value) {
 }
 
 static void send(json request) {
-    if (!bridgeAlive || !engineInput) { message("Motor indisponível. Use Instalar / reconectar."); return; }
+    if (!bridgeAlive || !engineInput) { message("Conexão indisponível. Use Reconectar."); return; }
     std::string wire = request.dump() + "\n";
     setBusy(true);
     size_t offset = 0;
     while (offset < wire.size()) {
         DWORD written = 0;
         if (!WriteFile(engineInput, wire.data() + offset, (DWORD)(wire.size() - offset), &written, nullptr) || !written) {
-            setBusy(false); message("A conexão com o motor foi encerrada."); return;
+            setBusy(false); message("A conexão com o aplicativo foi encerrada."); return;
         }
         offset += written;
     }
@@ -175,14 +185,102 @@ static json changes() {
         json value;
         if (kind == "bool") value = SendMessageW(f.control, BM_GETCHECK, 0, 0) == BST_CHECKED;
         else if (kind == "json") value = f.data["editedValue"];
-        else value = utf8(text(f.control));
+        else if (kind == "enum") {
+            LRESULT index = SendMessageW(f.control, CB_GETCURSEL, 0, 0);
+            if (index < 0 || index >= (LRESULT)f.data["choices"].size()) continue;
+            value = f.data["choices"][(size_t)index];
+        } else value = utf8(text(f.control));
         if (value != f.data["value"])
             result.push_back({{"page", page}, {"path", f.data["path"]}, {"value", value}});
     }
     return result;
 }
 
+
+static bool cursorPage() {
+    return snapshot.contains("pages") && !snapshot["pages"].empty() && snapshot["pages"][pageIndex]["id"] == "Cursors";
+}
+static json catalogData() {
+    return snapshot.value("cursorCatalog", json{{"query",""},{"selected",""},{"results",json::array()},{"cursorPreview",""},{"pointerPreview",""},{"installedName",""}});
+}
+static void layoutCursors() {
+    if (cursorWidgets.empty()) return;
+    RECT r{}; GetClientRect(panel, &r); int width = r.right - 24, available = r.bottom;
+    MoveWindow(cursorQuery, 12, 8, width - 128, 34, TRUE);
+    MoveWindow(GetDlgItem(panel,4002), width - 104, 8, 116, 34, TRUE);
+    MoveWindow(GetDlgItem(panel,4008),12,50,width,36,TRUE);
+    int leftWidth = width * 59 / 100, height = std::max(160, available - 182);
+    MoveWindow(cursorResults,12,94,leftWidth,height,TRUE);
+    MoveWindow(cursorPreviewBox,leftWidth+24,94,width-leftWidth-12,height,TRUE);
+    MoveWindow(GetDlgItem(panel,4009),12,available-78,width,26,TRUE);
+    int buttonWidth=(width-16)/3;
+    MoveWindow(GetDlgItem(panel,4004),12,available-44,buttonWidth,34,TRUE);
+    MoveWindow(GetDlgItem(panel,4005),20+buttonWidth,available-44,buttonWidth,34,TRUE);
+    MoveWindow(GetDlgItem(panel,4006),28+buttonWidth*2,available-44,buttonWidth,34,TRUE);
+    SCROLLINFO info{sizeof(info)};info.fMask=SIF_RANGE|SIF_PAGE|SIF_POS;info.nMax=0;info.nPage=available;
+    SetScrollInfo(panel,SB_VERT,&info,TRUE);
+}
+static LRESULT CALLBACK CursorPreviewProc(HWND h,UINT msg,WPARAM wp,LPARAM lp) {
+    if (msg==WM_PAINT) {
+        PAINTSTRUCT ps{};HDC dc=BeginPaint(h,&ps);RECT r{};GetClientRect(h,&r);FillRect(dc,&r,cardBrush);
+        auto data=catalogData(); auto items=data["results"];std::string selected=data["selected"];
+        std::wstring label=L"Selecione um resultado\npara carregar a prévia";
+        for(const auto& item:items) if(item["slug"]==selected) label=wide(item["name"].get<std::string>());
+        SelectObject(dc,font);SetBkMode(dc,TRANSPARENT);SetTextColor(dc,inkColor);
+        RECT title{10,12,r.right-10,72};DrawTextW(dc,label.c_str(),-1,&title,DT_CENTER|DT_WORDBREAK|DT_END_ELLIPSIS);
+        std::string paths[]={data.value("cursorPreview",std::string{}),data.value("pointerPreview",std::string{})};
+        for(int n=0;n<2;n++) {
+            int x=10+n*(r.right-20)/2, y=88;
+            if(!paths[n].empty() && imagingToken) {
+                Gdiplus::Graphics graphics(dc);Gdiplus::Image image(wide(paths[n]).c_str());
+                if(image.GetLastStatus()==Gdiplus::Ok) graphics.DrawImage(&image,x+std::max(0,((r.right-20)/2-64)/2),y,64,64);
+            }
+            RECT caption{x,158,x+(r.right-20)/2,190};DrawTextW(dc,n==0?L"Cursor":L"Ponteiro",-1,&caption,DT_CENTER|DT_SINGLELINE);
+        }
+        RECT info{10,204,r.right-10,r.bottom-10};DrawTextW(dc,L"PNG estático para Roblox\nFonte: Sweezy Cursors",-1,&info,DT_CENTER|DT_WORDBREAK);
+        EndPaint(h,&ps);return 0;
+    }
+    return DefWindowProcW(h,msg,wp,lp);
+}
+static void renderCursors() {
+    auto data=catalogData();
+    auto add=[](const wchar_t* cls,const std::wstring& caption,DWORD style,int id){HWND h=control(panel,cls,caption,style,id);cursorWidgets.push_back(h);return h;};
+    SetWindowTextW(heading,L"Cursores para Roblox");
+    cursorQuery=add(L"EDIT",wide(data.value("query",std::string{})),WS_TABSTOP|WS_BORDER|ES_AUTOHSCROLL,4001);
+    SendMessageW(cursorQuery,EM_SETCUEBANNER,TRUE,(LPARAM)L"Ex.: Minecraft, gato, anime…");SendMessageW(cursorQuery,EM_SETLIMITTEXT,80,0);
+    add(L"BUTTON",L"Pesquisar",WS_TABSTOP,4002);
+    add(L"STATIC",L"Pesquise no Sweezy Cursors. Selecione uma prévia e clique em Usar no Roblox.",SS_LEFT,4008);
+    cursorResults=add(L"LISTBOX",L"",WS_TABSTOP|WS_VSCROLL|LBS_NOTIFY|LBS_OWNERDRAWFIXED|LBS_HASSTRINGS|LBS_NOINTEGRALHEIGHT,4003);
+    SendMessageW(cursorResults,LB_SETITEMHEIGHT,0,60);
+    int index=0;
+    for(const auto& item:data["results"]) {
+        auto name=wide(item["name"].get<std::string>());SendMessageW(cursorResults,LB_ADDSTRING,0,(LPARAM)name.c_str());
+        if(item["slug"]==data["selected"]) SendMessageW(cursorResults,LB_SETCURSEL,index,0);
+        index++;
+    }
+    cursorPreviewBox=add(L"CaybCursorPreview",L"",0,4007);
+    auto installed=data.value("installedName",std::string{});
+    add(L"STATIC",installed.empty()?L"Nenhum cursor Sweezy selecionado.":L"Selecionado: "+wide(installed),SS_LEFT,4009);
+    add(L"BUTTON",L"Usar no Roblox",WS_TABSTOP,4004);
+    add(L"BUTTON",L"Restaurar padrão",WS_TABSTOP,4005);
+    add(L"BUTTON",L"Ver no Sweezy",WS_TABSTOP,4006);
+    EnableWindow(GetDlgItem(panel,4004),!data.value("selected",std::string{}).empty());
+    layoutCursors();
+}
+static bool drawCursorRow(LPARAM lp) {
+    auto* item=(DRAWITEMSTRUCT*)lp;if(item->CtlType!=ODT_LISTBOX||item->CtlID!=4003)return false;
+    auto data=catalogData();if(item->itemID>=data["results"].size())return true;
+    auto value=data["results"][item->itemID];RECT r=item->rcItem;FillRect(item->hDC,&r,background);
+    HBRUSH brush=CreateSolidBrush((item->itemState&ODS_SELECTED)?selectionColor:cardColor);
+    auto old=SelectObject(item->hDC,brush);auto pen=SelectObject(item->hDC,GetStockObject(NULL_PEN));
+    RoundRect(item->hDC,r.left,r.top+2,r.right,r.bottom-2,14,14);SelectObject(item->hDC,old);SelectObject(item->hDC,pen);DeleteObject(brush);
+    SetBkMode(item->hDC,TRANSPARENT);SetTextColor(item->hDC,inkColor);SelectObject(item->hDC,font);
+    RECT name{r.left+10,r.top+6,r.right-10,r.top+42};auto label=wide(value["name"].get<std::string>());
+    DrawTextW(item->hDC,label.c_str(),-1,&name,DT_WORDBREAK|DT_END_ELLIPSIS);
+    return true;
+}
 static void layoutFields() {
+    if(cursorPage()){layoutCursors();return;}
     RECT area{}; GetClientRect(panel, &area);
     int width = area.right - 26;
     for (auto& f : fields) {
@@ -204,12 +302,14 @@ static void layoutFields() {
 }
 static void renderPage(bool resetScroll = true) {
     rebuilding = true;
+    for(HWND h:cursorWidgets)DestroyWindow(h);cursorWidgets.clear();
     for (auto& f : fields) { if (f.label) DestroyWindow(f.label); if (f.control) DestroyWindow(f.control); if (f.button) DestroyWindow(f.button); }
     fields.clear();
     if (resetScroll) scrollPosition = 0;
     if (!snapshot.value("installed", false) || snapshot["pages"].empty()) {
-        SetWindowTextW(heading, L"Instale o motor original para continuar"); rebuilding = false; return;
+        SetWindowTextW(heading, L"Conclua a instalação para continuar"); rebuilding = false; return;
     }
+    if(cursorPage()){renderCursors();rebuilding=false;return;}
     auto page = snapshot["pages"][pageIndex];
     SetWindowTextW(heading, wide(page["title"].get<std::string>()).c_str());
     int y = 8, index = 0;
@@ -232,7 +332,7 @@ static void renderPage(bool resetScroll = true) {
                 f.control = control(panel, L"COMBOBOX", L"", WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL, 2000 + index);
                 int selected = -1, n = 0;
                 for (const auto& choice : data["choices"]) {
-                    auto s = wide(choice.get<std::string>());
+                    auto s = wide(data.contains("choiceLabels") ? data["choiceLabels"][n].get<std::string>() : choice.get<std::string>());
                     SendMessageW(f.control, CB_ADDSTRING, 0, (LPARAM)s.c_str());
                     if (choice == data["value"]) selected = n;
                     ++n;
@@ -294,12 +394,12 @@ static void editJson(int index) {
 static void startBridge() {
     engineMissing = GetFileAttributesW(enginePath.c_str()) == INVALID_FILE_ATTRIBUTES;
     if (engineMissing) {
-        setBusy(false); SetWindowTextW(status, L"Motor C# ausente: compile o pacote completo no Windows.");
-        SetWindowTextW(heading, L"Interface C++ pronta; motor ainda não compilado"); return;
+        setBusy(false); SetWindowTextW(status, L"Arquivo obrigatório ausente. Extraia o ZIP completo.");
+        SetWindowTextW(heading, L"Instalação incompleta"); return;
     }
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
     HANDLE readOut = nullptr, writeOut = nullptr, readIn = nullptr, writeIn = nullptr;
-    if (!CreatePipe(&readOut, &writeOut, &sa, 0)) { message("Não foi possível abrir o canal do motor."); setBusy(false); return; }
+    if (!CreatePipe(&readOut, &writeOut, &sa, 0)) { message("Não foi possível iniciar a comunicação com o aplicativo."); setBusy(false); return; }
     if (!CreatePipe(&readIn, &writeIn, &sa, 0)) { CloseHandle(readOut); CloseHandle(writeOut); setBusy(false); return; }
     SetHandleInformation(readOut, HANDLE_FLAG_INHERIT, 0); SetHandleInformation(writeIn, HANDLE_FLAG_INHERIT, 0);
     STARTUPINFOW si{sizeof(si)}; si.dwFlags = STARTF_USESTDHANDLES; si.hStdInput = readIn; si.hStdOutput = writeOut;
@@ -308,7 +408,7 @@ static void startBridge() {
     auto command = quote(enginePath) + L" -nativebridge";
     BOOL started = CreateProcessW(enginePath.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, appDir.c_str(), &si, &pi);
     CloseHandle(readIn); CloseHandle(writeOut);
-    if (!started) { CloseHandle(readOut); CloseHandle(writeIn); setBusy(false); message("Falha ao iniciar o motor .NET."); return; }
+    if (!started) { CloseHandle(readOut); CloseHandle(writeIn); setBusy(false); message("Não foi possível iniciar o aplicativo. Confira se o pacote foi extraído por completo."); return; }
     CloseHandle(pi.hThread); engineProcess = pi.hProcess; engineInput = writeIn; bridgeAlive = true; setBusy(true);
     WPARAM currentGeneration = ++generation;
     std::thread([readOut, currentGeneration]() {
@@ -320,18 +420,18 @@ static void startBridge() {
                 auto line = pending.substr(0, newline); pending.erase(0, newline + 1);
                 auto* reply = new json;
                 try { *reply = json::parse(line); }
-                catch (...) { *reply = {{"ok", false}, {"error", "Resposta inválida do motor"}}; }
+                catch (...) { *reply = {{"ok", false}, {"error", "O aplicativo retornou uma resposta inválida."}}; }
                 if (!PostMessageW(windowHandle, EngineReplyMessage, currentGeneration, (LPARAM)reply)) delete reply;
             }
         }
         CloseHandle(readOut);
-        auto* reply = new json{{"ok", false}, {"disconnected", true}, {"error", "Motor desconectado. Use Instalar / reconectar."}};
+        auto* reply = new json{{"ok", false}, {"disconnected", true}, {"error", "Conexão encerrada. Use Reconectar."}};
         if (!PostMessageW(windowHandle, EngineReplyMessage, currentGeneration, (LPARAM)reply)) delete reply;
     }).detach();
 }
 
 static bool runEngine(const wchar_t* arguments, bool reconnect) {
-    if (engineMissing) { message("Este executável é somente a interface. Compile o motor com build-cayb-trap.ps1 no Windows."); return false; }
+    if (engineMissing) { message("Extraia todo o ZIP e mantenha a pasta engine ao lado do executável."); return false; }
     if (busy) return false;
     if (!changes().empty() || snapshot.value("dirty", false)) {
         MessageBoxW(windowHandle, L"Salve as alterações antes de iniciar outra operação.", L"cayb trap", MB_OK | MB_ICONINFORMATION); return false;
@@ -351,10 +451,22 @@ static bool runEngine(const wchar_t* arguments, bool reconnect) {
 }
 
 static LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if(msg==WM_DRAWITEM&&drawCursorRow(lp))return TRUE;
     if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_COMMAND && !busy && !rebuilding) {
         int id = LOWORD(wp);
         if (HIWORD(wp) == BN_CLICKED || HIWORD(wp) == CBN_SELCHANGE) bubbleClick();
+
+        if(cursorPage()&&id>=4001&&id<=4009){
+            if(id==4002&&HIWORD(wp)==BN_CLICKED){SetWindowTextW(status,L"Pesquisando no Sweezy…");send({{"op","cursor.search"},{"query",utf8(text(cursorQuery))}});}
+            else if(id==4003&&HIWORD(wp)==LBN_SELCHANGE){
+                LRESULT i=SendMessageW(cursorResults,LB_GETCURSEL,0,0);auto data=catalogData();
+                if(i>=0&&i<(LRESULT)data["results"].size()){SetWindowTextW(status,L"Carregando prévia…");send({{"op","cursor.preview"},{"slug",data["results"][(size_t)i]["slug"]}});}
+            }else if(id==4004&&HIWORD(wp)==BN_CLICKED){auto data=catalogData();SetWindowTextW(status,L"Preparando cursor para Roblox…");send({{"op","cursor.install"},{"slug",data["selected"]}});}
+            else if(id==4005&&HIWORD(wp)==BN_CLICKED){if(MessageBoxW(windowHandle,L"Restaurar os cursores padrão na próxima abertura do Roblox?",L"cayb trap",MB_YESNO|MB_ICONQUESTION)==IDYES)send({{"op","cursor.reset"}});}
+            else if(id==4006&&HIWORD(wp)==BN_CLICKED){auto data=catalogData();auto slug=data.value("selected",std::string{});auto url=wide(slug.empty()?"https://sweezy-cursors.com/":"https://sweezy-cursors.com/cursor/"+slug+"/");ShellExecuteW(windowHandle,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);}
+            return 0;
+        }
         if (id >= 3000 && id < 3000 + (int)fields.size()) { editJson(id - 3000); return 0; }
         if (id >= 1000 && id < 1000 + (int)fields.size() && HIWORD(wp) == BN_CLICKED) {
             auto& f = fields[id - 1000];
@@ -440,7 +552,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (wp != generation) return 0;
         setBusy(false);
         if (!reply->value("ok", false)) {
-            if (reply->value("disconnected", false)) { bridgeAlive = false; SetWindowTextW(status, L"Motor desconectado — use reconectar"); }
+            if (reply->value("disconnected", false)) { bridgeAlive = false; SetWindowTextW(status, L"Conexão encerrada — use Reconectar"); }
             else { message(reply->value("error", "Erro desconhecido")); requestedPage = pageIndex; SendMessageW(nav, LB_SETCURSEL, pageIndex, 0); }
             return 0;
         }
@@ -466,7 +578,8 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         pageIndex = std::min(requestedPage, std::max(0, (int)snapshot["pages"].size() - 1));
         SendMessageW(nav, LB_SETCURSEL, pageIndex, 0); rebuilding = false;
         renderPage(); setBusy(false);
-        SetWindowTextW(status, !snapshot.value("installed", false) ? L"Motor presente; instalação necessária." : snapshot.value("dirty", false) ? L"Alterações pendentes — clique em Salvar" : L"Conectado ao motor original");
+        SetWindowTextW(installButton,snapshot.value("installed",false)?L"Reconectar":L"Instalar cayb trap");
+        SetWindowTextW(status, !snapshot.value("installed", false) ? L"Instale o cayb trap para continuar." : snapshot.value("dirty", false) ? L"Alterações pendentes — clique em Salvar" : L"Pronto para usar");
         auto notice = snapshot.value("notice", std::string{});
         if (!notice.empty()) SetWindowTextW(status, wide(notice).c_str());
         return 0;
@@ -501,7 +614,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_MOUSEWHEEL) return SendMessageW(panel, msg, wp, lp);
     if (msg == WM_CTLCOLORSTATIC || msg == WM_CTLCOLORLISTBOX) { SetTextColor((HDC)wp, inkColor); SetBkColor((HDC)wp, canvasColor); return (LRESULT)background; }
     if (msg == WM_CLOSE) {
-        if (busy && bridgeAlive) { MessageBoxW(h, L"Aguarde a operação do motor terminar antes de fechar.", L"cayb trap", MB_OK); return 0; }
+        if (busy && bridgeAlive) { MessageBoxW(h, L"Aguarde a operação terminar antes de fechar.", L"cayb trap", MB_OK); return 0; }
         if ((!changes().empty() || snapshot.value("dirty", false)) && MessageBoxW(h, L"Fechar sem salvar as alterações pendentes?", L"cayb trap", MB_YESNO | MB_ICONQUESTION) != IDYES) return 0;
         if (engineInput) { CloseHandle(engineInput); engineInput = nullptr; }
         DestroyWindow(h); return 0;
@@ -525,9 +638,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int show) {
     INITCOMMONCONTROLSEX ic{sizeof(ic), ICC_STANDARD_CLASSES}; InitCommonControlsEx(&ic);
     font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
     titleFont = CreateFontW(-26, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+    Gdiplus::GdiplusStartupInput imaging;
+    if(Gdiplus::GdiplusStartup(&imagingToken,&imaging,nullptr)!=Gdiplus::Ok)imagingToken=0;
     background = CreateSolidBrush(canvasColor); cardBrush = CreateSolidBrush(cardColor);
     WNDCLASSW wc{}; wc.hInstance = instance; wc.hCursor = LoadCursorW(nullptr, IDC_ARROW); wc.hbrBackground = background;
     wc.lpfnWndProc = PanelProc; wc.lpszClassName = L"CaybPanel"; RegisterClassW(&wc);
+    wc.lpfnWndProc=CursorPreviewProc;wc.lpszClassName=L"CaybCursorPreview";RegisterClassW(&wc);
     wc.lpfnWndProc = EditorProc; wc.lpszClassName = L"CaybJsonEditor"; RegisterClassW(&wc);
     wc.lpfnWndProc = WindowProc; wc.lpszClassName = L"CaybTrapCpp"; wc.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(1)); RegisterClassW(&wc);
     HWND h = CreateWindowExW(0, wc.lpszClassName, L"cayb trap — Configurações", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
@@ -541,5 +657,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int show) {
     if (engineProcess) CloseHandle(engineProcess);
     if (singleton) CloseHandle(singleton);
     DeleteObject(font); DeleteObject(titleFont); DeleteObject(background); DeleteObject(cardBrush);
+    if(imagingToken)Gdiplus::GdiplusShutdown(imagingToken);
     return (int)msg.wParam;
 }
