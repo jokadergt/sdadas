@@ -128,8 +128,12 @@ def main():
             other = Path(temp)/"Versions/version-1111111111111111"
             other.mkdir(parents=True)
             (other/"RobloxPlayerBeta.exe").write_bytes(b"fixture")
+            refreshed = request({"op":"snapshot"})
+            application = next(p for p in refreshed["pages"] if p["id"] == "Application")
+            version_field = next(f for f in application["fields"] if f["path"] == "InstalledVersion")
+            selected_path = next(p for p in version_field["choices"] if p.endswith("version-1111111111111111"))
             selected = request({"op":"save", "changes":[
-                {"page":"Application","path":"InstalledVersion","value":str(other)},
+                {"page":"Application","path":"InstalledVersion","value":selected_path},
                 {"page":"Application","path":"AppFont","value":"Consolas"},
                 {"page":"Application","path":"Corner","value":"MuitoRedondo"},
                 {"page":"Application","path":"ApplicationNotifications","value":False}]})
@@ -137,7 +141,7 @@ def main():
             assert json.loads((other/"ClientSettings/ClientAppSettings.json").read_text()) == expected_flags
             assert selected["appFont"] == "Consolas" and selected["appCorner"] == 3
             prefs = json.loads((Path(temp)/"Settings.json").read_text())
-            assert prefs["TargetVersionPath"] == str(other)
+            assert Path(prefs["TargetVersionPath"]).samefile(other)
             assert prefs["ApplicationNotifications"] is False
             invalid = request({"op":"save","changes":[{"page":"Application","path":"InstalledVersion","value":str(Path(temp)/"unknown")}]}, ok=False)
             assert not invalid["ok"]

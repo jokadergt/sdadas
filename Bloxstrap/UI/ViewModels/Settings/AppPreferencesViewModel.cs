@@ -10,6 +10,7 @@ public class AppPreferencesViewModel
         get => App.Settings.Prop.TargetVersionPath;
         set
         {
+            value = value == "" ? "" : Path.GetFullPath(value);
             if (value != "" && !TargetVersionMods.Installed().Contains(value, StringComparer.OrdinalIgnoreCase))
                 throw new ArgumentException("Selecione uma versão instalada da lista.");
             App.Settings.Prop.TargetVersionPath = value;
