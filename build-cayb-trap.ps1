@@ -18,4 +18,5 @@ dotnet publish Bloxstrap/Bloxstrap.csproj -c Release -r win-x64 --self-contained
 if ($LASTEXITCODE -ne 0) { throw 'Falha na compilacao do motor C#.' }
 Copy-Item 'dist-native/cayb trap.exe' 'dist/cayb trap.exe' -Force
 Copy-Item LEIA-ME-CAYB-TRAP.md dist/LEIA-ME.md -Force
+Copy-Item 'Assets/capybara-4096.png' 'dist/capybara-4096.png' -Force
 Write-Host 'Pronto: dist/cayb trap.exe. Mantenha a pasta engine ao lado do executavel.'

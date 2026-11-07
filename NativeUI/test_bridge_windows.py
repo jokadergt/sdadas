@@ -217,6 +217,13 @@ def main():
             assert reopened.returncode == 0, reopened.stderr
             assert not custom_font.exists(), "Removed font was unexpectedly reapplied"
 
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KEY) as key:
+                assert winreg.QueryValueEx(key,"Publisher")[0] == "cayb trap"
+            app_page = next(p for p in json.loads(reopened.stdout.splitlines()[0])["pages"] if p["id"] == "Application")
+            assert not any(f["path"] == "ProfileUsername" for f in app_page["fields"])
+            assert any(f["path"] == "$account" for f in app_page["fields"])
+            from test_native_windows import check_native
+            check_native(engine.parent.parent/"cayb trap.exe")
             print("Bridge integration checks passed.")
         finally:
             if fake_game and fake_game.poll() is None:

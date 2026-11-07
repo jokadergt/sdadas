@@ -21,11 +21,11 @@ namespace Bloxstrap
         // Keep upstream attribution; this is a customized build.
         public static readonly bool UpstreamApplicationUpdatesEnabled = false;
 
-        public const string ProjectOwner = "Bloxstrap";
-        public const string ProjectRepository = "bloxstraplabs/bloxstrap";
-        public const string ProjectDownloadLink = "https://bloxstraplabs.com";
-        public const string ProjectHelpLink = "https://bloxstraplabs.com/wiki/help/";
-        public const string ProjectSupportLink = "https://github.com/bloxstraplabs/bloxstrap/issues/new";
+        public const string ProjectOwner = "cayb trap";
+        public const string ProjectRepository = "jokadergt/sdadas";
+        public const string ProjectDownloadLink = "https://github.com/jokadergt/sdadas/actions";
+        public const string ProjectHelpLink = "https://github.com/jokadergt/sdadas#readme";
+        public const string ProjectSupportLink = "https://github.com/jokadergt/sdadas/issues/new";
 
         public const string RobloxPlayerAppName = "RobloxPlayerBeta";
         public const string RobloxStudioAppName = "RobloxStudioBeta";

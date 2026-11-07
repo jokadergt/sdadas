@@ -117,6 +117,11 @@ Na aba **Aplicativo**, escolha uma instalação Player detectada nas pastas Vers
 
 A fonte da interface (Segoe UI, Arial, Consolas ou Minecraft) e os quatro níveis de arredondamento são salvos e aplicados à janela C++. O tema nativo usa fundo preto. O indicador de foco é ocultado no clique do mouse, mas permanece disponível para navegação por teclado.
 
-As notificações surgem no canto inferior direito após aplicar arquivos, por cinco segundos. Informe o nome de usuário público Roblox na aba Aplicativo para exibir o nome e avatar desse perfil; isso não verifica nem detecta a conta conectada. Não pede cookies, senha ou acesso à sessão. Se a consulta de perfil falhar, a mensagem indica a indisponibilidade. As notificações podem ser desativadas.
+As notificações surgem no canto inferior direito após aplicar arquivos, por cinco segundos. O perfil é detectado automaticamente pelos logs Player locais das últimas 24 horas. Com o Roblox aberto, o app exige um log criado no início do processo atual; sem ele, não informa uma conta. Com o Roblox fechado, o perfil é identificado como última sessão. Mais de uma instância ou logs indisponíveis resultam em conta não identificada. Não pede cookies, senha ou acesso à sessão. Se a consulta de perfil falhar, a mensagem indica a indisponibilidade. As notificações podem ser desativadas.
 
 A aplicação continua baseada em arquivos antes da abertura do jogo. O perfil gráfico reduz a qualidade, mas não remove globalmente texturas de Parts, Decals, Texture ou SurfaceAppearance dos mapas, nem contorna a lista de FastFlags aceita pelo Roblox.
+
+
+## Identidade visual
+
+As abas usam desenhos vetoriais próprios. Os seletores nativos têm fundo escuro, a janela tem borda cinza e a navegação usa um deslocamento suave de 180 ms, respeitando a preferência de animações do Windows. O PNG capybara-4096.png é uma exportação 4096×4096 da logo existente; o ICO mantém várias resoluções próprias para o Windows. O editor e o produto no Windows usam cayb trap. Os créditos e a licença Bloxstrap permanecem no projeto e no diálogo de licenças.

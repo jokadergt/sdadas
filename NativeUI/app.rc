@@ -3,3 +3,28 @@
 3 WAVE "Sounds/bubble.wav"
 
 4 RCDATA "../Bloxstrap/Resources/Fonts/Minecraft.ttf"
+
+1 VERSIONINFO
+FILEVERSION 2,12,0,0
+PRODUCTVERSION 2,12,0,0
+FILEOS 0x40004
+FILETYPE 1
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+   VALUE "CompanyName", "cayb trap\0"
+   VALUE "FileDescription", "cayb trap - Configuracoes\0"
+   VALUE "FileVersion", "2.12.0\0"
+   VALUE "InternalName", "cayb trap\0"
+   VALUE "OriginalFilename", "cayb trap.exe\0"
+   VALUE "ProductName", "cayb trap\0"
+   VALUE "ProductVersion", "2.12.0\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END

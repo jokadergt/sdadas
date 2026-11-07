@@ -8,6 +8,11 @@ internal static class CursorCatalogChecks
 {
     public static void Run()
     {
+        if (LocalRobloxAccount.Parse("userid:123, other:456") != 0) throw new Exception("Unrelated user ID accepted.");
+        if (LocalRobloxAccount.Parse("[FLog::GameJoinLoadTime] Report game_join_loadtime: placeid:55, userid:123,\n[FLog::GameJoinLoadTime] Report game_join_loadtime: userid:456, ") != 456)
+            throw new Exception("Automatic profile parser failed.");
+        if (LocalRobloxAccount.Parse("[FLog::GameJoinLoadTime] Report game_join_loadtime: userid:9999999999999999999999,") != 0)
+            throw new Exception("Invalid profile ID accepted.");
         string asset = "{\"path\":\"https://cdn.sweezy-cursors.com/cursor_packs/test/image.png\",\"offsetX\":2,\"offsetY\":3}";
         string json = "{\"cursorConfig\":{\"name\":\"Test & cursor\",\"isAnimated\":true,\"cursor\":" + asset + ",\"pointer\":" + asset + "}}";
         string html = "<article data-cursor-pack-payload=\"" + WebUtility.HtmlEncode(json) +

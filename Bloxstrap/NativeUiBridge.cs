@@ -65,11 +65,13 @@ internal sealed class NativeUiBridge
 
     private void Initialize()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(App.UninstallKey);
+        using var key = Registry.CurrentUser.OpenSubKey(App.UninstallKey, writable: true);
         var location = key?.GetValue("InstallLocation") as string;
         _installed = location is not null && Directory.Exists(location);
         if (!_installed) return;
         Paths.Initialize(location!);
+        key!.SetValue("Publisher", App.ProjectName);
+        key.SetValue("DisplayName", App.ProjectName);
         // Refuse corrupt configuration; do not invoke JsonManager.Load's recovery writes.
         CheckJson<Settings>(App.Settings.FileLocation);
         CheckJson<Models.Persistable.State>(App.State.FileLocation);
@@ -142,6 +144,8 @@ internal sealed class NativeUiBridge
     private IEnumerable<object> Fields(string page, object model)
     {
         if (page == "Cursors") yield break;
+        if (page == "Application")
+            yield return new { path = "$account", kind = "info", label = LocalRobloxAccount.Detect().Description };
         foreach (var property in model.GetType().GetProperties())
         {
             // Collections/selection indexes are represented by native JSON editors or selectors below.

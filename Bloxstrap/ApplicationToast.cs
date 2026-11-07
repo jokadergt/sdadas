@@ -19,10 +19,11 @@ internal static class ApplicationToast
         {
             if ((DateTime.UtcNow - _last).TotalSeconds < 3) return;
             _last = DateTime.UtcNow;
-            string username = App.Settings.Prop.ProfileUsername;
-            string name = username == "" ? "cayb trap" : "@" + username;
+            var detected = LocalRobloxAccount.Detect();
+            string username = detected.Id.ToString(CultureInfo.InvariantCulture);
+            string name = detected.Id == 0 ? "cayb trap • conta não identificada" : "Roblox • ID " + username;
             BitmapSource? avatar = null;
-            if (username != "")
+            if (detected.Id > 0)
             {
                 if (_cachedUser == username) { name = _cachedName; avatar = _cachedAvatar; }
                 else
@@ -30,12 +31,9 @@ internal static class ApplicationToast
                     try
                     {
                         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5), MaxResponseContentBufferSize = 2 * 1024 * 1024 };
-                        using var body = new StringContent(JsonSerializer.Serialize(new { usernames = new[] { username }, excludeBannedUsers = true }), Encoding.UTF8, "application/json");
-                        using var response = await client.PostAsync("https://users.roblox.com/v1/usernames/users", body);
-                        response.EnsureSuccessStatusCode();
-                        using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-                        var user = data.RootElement.GetProperty("data").EnumerateArray().First();
-                        long id = user.GetProperty("id").GetInt64();
+                        long id = detected.Id;
+                        using var data = JsonDocument.Parse(await client.GetStringAsync($"https://users.roblox.com/v1/users/{id}"));
+                        var user = data.RootElement;
                         name = user.GetProperty("displayName").GetString() + " (@" + user.GetProperty("name").GetString() + ")";
                         using var thumbs = JsonDocument.Parse(await client.GetStringAsync($"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={id}&size=150x150&format=Png&isCircular=false"));
                         string? url = thumbs.RootElement.GetProperty("data")[0].GetProperty("imageUrl").GetString();
@@ -48,9 +46,10 @@ internal static class ApplicationToast
                         }
                         _cachedUser = username; _cachedName = name; _cachedAvatar = avatar;
                     }
-                    catch { name = "@" + username + " • perfil indisponível"; }
+                    catch { name = "Roblox • ID " + username + " • perfil indisponível"; }
                 }
             }
+            if (detected.Id > 0 && !detected.Running) name += " • última sessão";
             _window?.Close();
             var stack = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16) };
             if (avatar != null) stack.Children.Add(new Image { Source = avatar, Width = 48, Height = 48, Margin = new Thickness(0, 0, 12, 0) });

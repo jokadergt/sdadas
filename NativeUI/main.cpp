@@ -28,6 +28,8 @@ static HWND windowHandle, nav, panel, heading, status, saveButton, installButton
 static HINSTANCE instance;
 static HFONT font, titleFont;
 static int corner = 24;
+static bool animateNavigation = false;
+static ULONGLONG transitionStart = 0;
 static std::string currentFont = "SegoeUI";
 static HBRUSH background, cardBrush;
 static COLORREF canvasColor = RGB(0,0,0), inkColor = RGB(240,240,240), cardColor = RGB(14,14,14), selectionColor = RGB(28,28,28);
@@ -96,6 +98,37 @@ static bool drawButton(LPARAM lp) {
     SelectObject(dc, oldFont); SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(brush); DeleteObject(pen);
     return true;
 }
+static bool drawComboItem(LPARAM lp) {
+    auto* item = (DRAWITEMSTRUCT*)lp;
+    if (!item || item->CtlType != ODT_COMBOBOX) return false;
+    HBRUSH brush = CreateSolidBrush((item->itemState & ODS_SELECTED) ? selectionColor : cardColor);
+    FillRect(item->hDC, &item->rcItem, brush); DeleteObject(brush);
+    if (item->itemID != (UINT)-1) {
+        int n = (int)SendMessageW(item->hwndItem, CB_GETLBTEXTLEN, item->itemID, 0);
+        std::wstring label(n + 1, 0); SendMessageW(item->hwndItem, CB_GETLBTEXT, item->itemID, (LPARAM)label.data());
+        SetBkMode(item->hDC, TRANSPARENT); SetTextColor(item->hDC, inkColor); SelectObject(item->hDC, font);
+        RECT r = item->rcItem; r.left += 12; r.right -= 8; DrawTextW(item->hDC,label.c_str(),-1,&r,DT_SINGLELINE|DT_VCENTER|DT_END_ELLIPSIS);
+    }
+    return true;
+}
+
+// Original line icons; geometry is drawn at the requested pixel size.
+static void tabIcon(HDC dc, int x, int y, const std::string& id, bool selected) {
+    using namespace Gdiplus;
+    Graphics g(dc); g.SetSmoothingMode(SmoothingModeAntiAlias); g.TranslateTransform((REAL)x,(REAL)y);
+    Pen p(selected ? Color(255,96,205,255) : Color(255,224,224,224),1.7f); p.SetStartCap(LineCapRound); p.SetEndCap(LineCapRound); p.SetLineJoin(LineJoinRound);
+    auto line=[&](REAL a,REAL b,REAL c,REAL d){g.DrawLine(&p,a,b,c,d);};
+    if(id=="Integrations") {g.DrawEllipse(&p,2.f,7.f,12.f,9.f);g.DrawEllipse(&p,10.f,7.f,12.f,9.f);}
+    else if(id=="Behaviour") {g.DrawArc(&p,2.f,3.f,20.f,20.f,195.f,150.f);line(12,13,18,7);g.DrawEllipse(&p,10.f,11.f,4.f,4.f);line(4,19,20,19);}
+    else if(id=="Mods") {g.DrawRectangle(&p,4.f,5.f,16.f,15.f);line(4,10,20,10);line(9,5,9,20);g.DrawEllipse(&p,9.f,1.f,6.f,4.f);}
+    else if(id=="Cursors") {PointF pts[]={{4,2},{5,21},{10,16},{14,22},{17,20},{13,14},{21,13},{4,2}};g.DrawLines(&p,pts,8);}
+    else if(id=="FastFlags") {line(5,22,5,2);PointF pts[]={{5,3},{20,3},{17,8},{20,13},{5,13}};g.DrawLines(&p,pts,5);}
+    else if(id=="Appearance") {g.DrawEllipse(&p,2.f,2.f,20.f,20.f);g.DrawEllipse(&p,6.f,6.f,2.f,2.f);g.DrawEllipse(&p,14.f,5.f,2.f,2.f);g.DrawEllipse(&p,16.f,12.f,2.f,2.f);g.DrawArc(&p,7.f,12.f,8.f,7.f,0.f,160.f);}
+    else if(id=="Shortcuts") {g.DrawRectangle(&p,3.f,8.f,13.f,13.f);line(11,13,21,3);line(14,3,21,3);line(21,3,21,10);}
+    else if(id=="Application") {g.DrawRectangle(&p,2.f,3.f,20.f,18.f);line(2,8,22,8);line(8,8,8,21);line(12,13,18,13);line(12,17,16,17);}
+    else {g.DrawArc(&p,3.f,6.f,19.f,16.f,175.f,360.f);g.DrawEllipse(&p,3.f,2.f,5.f,7.f);g.DrawEllipse(&p,13.f,2.f,5.f,6.f);line(9,12,11,12);g.DrawEllipse(&p,17.f,13.f,3.f,2.f);line(15,18,19,18);}
+}
+
 static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
     if (msg == WM_LBUTTONDOWN) SendMessageW(h, WM_CHANGEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
     if (msg == WM_SIZE) roundControl(h);
@@ -108,6 +141,17 @@ static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM l
     bool toggle = (GetWindowLongPtrW(h, GWL_STYLE) & BS_TYPEMASK) == BS_AUTOCHECKBOX;
     wchar_t className[32]{}; GetClassNameW(h, className, 32);
     toggle = toggle && _wcsicmp(className, L"BUTTON") == 0;
+    bool combo = _wcsicmp(className, L"COMBOBOX") == 0;
+    if (combo && msg == WM_ERASEBKGND) return 1;
+    if (combo && msg == WM_PAINT) {
+        PAINTSTRUCT ps{}; HDC dc = BeginPaint(h,&ps); RECT r{}; GetClientRect(h,&r); FillRect(dc,&r,background);
+        HBRUSH brush=CreateSolidBrush(cardColor); auto old=SelectObject(dc,brush), oldPen=SelectObject(dc,GetStockObject(NULL_PEN));
+        RoundRect(dc,0,0,r.right,r.bottom,corner,corner);
+        auto label=text(h); RECT t=r;t.left+=12;t.right-=34;SetBkMode(dc,TRANSPARENT);SetTextColor(dc,IsWindowEnabled(h)?inkColor:RGB(128,128,128));SelectObject(dc,font);
+        DrawTextW(dc,label.c_str(),-1,&t,DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS);
+        HPEN arrow=CreatePen(PS_SOLID,2,inkColor);SelectObject(dc,arrow);MoveToEx(dc,r.right-23,r.bottom/2-2,nullptr);LineTo(dc,r.right-18,r.bottom/2+3);LineTo(dc,r.right-13,r.bottom/2-2);
+        SelectObject(dc,oldPen);SelectObject(dc,old);DeleteObject(arrow);DeleteObject(brush);EndPaint(h,&ps);return 0;
+    }
     if (toggle && msg == WM_PAINT) {
         PAINTSTRUCT ps{}; HDC dc = BeginPaint(h, &ps); RECT r{}; GetClientRect(h, &r);
         FillRect(dc, &r, background);
@@ -135,6 +179,7 @@ static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM l
 
 static void message(const std::string& value) { MessageBoxW(windowHandle, wide(value).c_str(), L"cayb trap", MB_OK | MB_ICONERROR); }
 static HWND control(HWND parent, const wchar_t* klass, const std::wstring& value, DWORD style, int id = 0) {
+    if (_wcsicmp(klass,L"COMBOBOX") == 0) style |= CBS_OWNERDRAWFIXED | CBS_HASSTRINGS;
     if (_wcsicmp(klass, L"BUTTON") == 0 && ((style & BS_TYPEMASK) == BS_PUSHBUTTON || (style & BS_TYPEMASK) == BS_DEFPUSHBUTTON))
         style = (style & ~BS_TYPEMASK) | BS_OWNERDRAW;
     HWND h = CreateWindowExW(0, klass, value.c_str(), WS_CHILD | WS_VISIBLE | style,
@@ -359,6 +404,7 @@ static void renderPage(bool resetScroll = true) {
 struct JsonEditor { HWND edit = nullptr; bool done = false, accepted = false; json value; };
 static LRESULT CALLBACK EditorProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     auto* state = (JsonEditor*)GetWindowLongPtrW(h, GWLP_USERDATA);
+    if (msg == WM_DRAWITEM && drawComboItem(lp)) return TRUE;
     if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_CREATE) {
         state = (JsonEditor*)((CREATESTRUCTW*)lp)->lpCreateParams; SetWindowLongPtrW(h, GWLP_USERDATA, (LONG_PTR)state);
@@ -459,7 +505,9 @@ static bool runEngine(const wchar_t* arguments, bool reconnect) {
 }
 
 static LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
+    if(msg==WM_MEASUREITEM && ((MEASUREITEMSTRUCT*)lp)->CtlType==ODT_COMBOBOX) { ((MEASUREITEMSTRUCT*)lp)->itemHeight=30;return TRUE; }
     if(msg==WM_DRAWITEM&&drawCursorRow(lp))return TRUE;
+    if (msg == WM_DRAWITEM && drawComboItem(lp)) return TRUE;
     if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_COMMAND && !busy && !rebuilding) {
         int id = LOWORD(wp);
@@ -479,7 +527,7 @@ static LRESULT CALLBACK PanelProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (id >= 1000 && id < 1000 + (int)fields.size() && HIWORD(wp) == BN_CLICKED) {
             auto& f = fields[id - 1000];
             if (f.data["path"] == "$uninstall") { if (runEngine(L"-uninstall", true)) DestroyWindow(windowHandle); return 0; }
-            if (MessageBoxW(windowHandle, L"Executar esta ação do Bloxstrap? Algumas ações abrem os diálogos originais e podem alterar arquivos imediatamente.", L"cayb trap", MB_YESNO | MB_ICONQUESTION) == IDYES)
+            if (MessageBoxW(windowHandle, L"Executar esta ação do cayb trap? Algumas ações podem alterar arquivos imediatamente.", L"cayb trap", MB_YESNO | MB_ICONQUESTION) == IDYES)
                 send({{"op", "command"}, {"page", snapshot["pages"][pageIndex]["id"]}, {"path", f.data["path"]}, {"changes", changes()}});
             return 0;
         }
@@ -536,11 +584,24 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         installButton = control(h, L"BUTTON", L"Instalar / reconectar", WS_TABSTOP, 14);
         BOOL dark = TRUE; DwmSetWindowAttribute(h, 20, &dark, sizeof(dark));
         DWORD corners = 2; DwmSetWindowAttribute(h, 33, &corners, sizeof(corners));
+        COLORREF stroke = RGB(88,88,96), caption=RGB(0,0,0);
+        DwmSetWindowAttribute(h,34,&stroke,sizeof(stroke)); DwmSetWindowAttribute(h,35,&caption,sizeof(caption));
         layout(); startBridge(); return 0;
+    }
+    if(msg==WM_PAINT) {
+        PAINTSTRUCT ps{};HDC dc=BeginPaint(h,&ps);RECT r{};GetClientRect(h,&r);FillRect(dc,&r,background);
+        HBRUSH stroke=CreateSolidBrush(RGB(88,88,96));FrameRect(dc,&r,stroke);DeleteObject(stroke);EndPaint(h,&ps);return 0;
+    }
+    if(msg==WM_TIMER && wp==60) {
+        float t=std::min(1.f,(GetTickCount64()-transitionStart)/180.f),ease=1.f-(1.f-t)*(1.f-t)*(1.f-t);
+        RECT r{};GetClientRect(h,&r);int offset=(int)((1.f-ease)*18.f);
+        MoveWindow(panel,240+offset,66,r.right-250-offset,r.bottom-134,TRUE);
+        if(t>=1.f) KillTimer(h,60);return 0;
     }
     if (msg == WM_GETMINMAXINFO) { auto* info = (MINMAXINFO*)lp; info->ptMinTrackSize = {1000, 620}; return 0; }
     if (msg == WM_SIZE) { if (panel) layout(); return 0; }
     if (msg == WM_MEASUREITEM) { ((MEASUREITEMSTRUCT*)lp)->itemHeight = 46; return TRUE; }
+    if (msg == WM_DRAWITEM && drawComboItem(lp)) return TRUE;
     if (msg == WM_DRAWITEM && drawButton(lp)) return TRUE;
     if (msg == WM_DRAWITEM && wp == 1) {
         auto* item = (DRAWITEMSTRUCT*)lp; if (item->itemID == (UINT)-1) return TRUE;
@@ -553,7 +614,8 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             HBRUSH accent = CreateSolidBrush(RGB(96, 205, 255)); FillRect(item->hDC, &marker, accent); DeleteObject(accent); }
         wchar_t label[256]{}; SendMessageW(nav, LB_GETTEXT, item->itemID, (LPARAM)label);
         SetTextColor(item->hDC, inkColor); SetBkMode(item->hDC, TRANSPARENT); SelectObject(item->hDC, font);
-        RECT rect = item->rcItem; rect.left += 16; DrawTextW(item->hDC, label, -1, &rect, DT_SINGLELINE | DT_VCENTER); return TRUE;
+        if(item->itemID < snapshot["pages"].size()) tabIcon(item->hDC,item->rcItem.left+16,item->rcItem.top+11,snapshot["pages"][item->itemID]["id"].get<std::string>(),selected);
+        RECT rect = item->rcItem; rect.left += 50; DrawTextW(item->hDC, label, -1, &rect, DT_SINGLELINE | DT_VCENTER); return TRUE;
     }
     if (msg == EngineReplyMessage) {
         std::unique_ptr<json> reply((json*)lp);
@@ -604,6 +666,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         pageIndex = std::min(requestedPage, std::max(0, (int)snapshot["pages"].size() - 1));
         SendMessageW(nav, LB_SETCURSEL, pageIndex, 0); rebuilding = false;
         renderPage(); setBusy(false);
+        if(animateNavigation) { BOOL animations=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&animations,0);if(animations){transitionStart=GetTickCount64();SetTimer(h,60,16,nullptr);}animateNavigation=false; }
         SetWindowTextW(installButton,snapshot.value("installed",false)?L"Reconectar":L"Instalar cayb trap");
         SetWindowTextW(status, !snapshot.value("installed", false) ? L"Instale o cayb trap para continuar." : snapshot.value("dirty", false) ? L"Alterações pendentes — clique em Salvar" : L"Pronto para usar");
         auto notice = snapshot.value("notice", std::string{});
@@ -633,6 +696,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         else if (!busy && id == 1 && HIWORD(wp) == LBN_SELCHANGE) {
             requestedPage = (int)SendMessageW(nav, LB_GETCURSEL, 0, 0);
+            animateNavigation = requestedPage != pageIndex;
             send({{"op", "apply"}, {"changes", changes()}});
         }
         return 0;

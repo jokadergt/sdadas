@@ -84,7 +84,7 @@ namespace Bloxstrap
 
                 uninstallKey.SetValueSafe("InstallLocation", Paths.Base);
                 uninstallKey.SetValueSafe("NoRepair", 1);
-                uninstallKey.SetValueSafe("Publisher", App.ProjectOwner);
+                uninstallKey.SetValueSafe("Publisher", App.ProjectName);
                 uninstallKey.SetValueSafe("ModifyPath", $"\"{Paths.Application}\" -settings");
                 uninstallKey.SetValueSafe("QuietUninstallString", $"\"{Paths.Application}\" -uninstall -quiet");
                 uninstallKey.SetValueSafe("UninstallString", $"\"{Paths.Application}\" -uninstall");
@@ -469,7 +469,7 @@ namespace Bloxstrap
             {
                 uninstallKey.SetValueSafe("DisplayVersion", App.Version);
 
-                uninstallKey.SetValueSafe("Publisher", App.ProjectOwner);
+                uninstallKey.SetValueSafe("Publisher", App.ProjectName);
                 uninstallKey.SetValueSafe("HelpLink", App.ProjectHelpLink);
                 uninstallKey.SetValueSafe("URLInfoAbout", App.ProjectSupportLink);
                 uninstallKey.SetValueSafe("URLUpdateInfo", App.ProjectDownloadLink);
