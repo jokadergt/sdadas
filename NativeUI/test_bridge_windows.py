@@ -87,7 +87,7 @@ def main():
             assert len(expected_flags) == 18
             assert json.loads(flags_path.read_text()) == expected_flags
             pages = {p["id"]: p for p in state["pages"]}
-            assert set(pages) == {"Integrations", "Behaviour", "Mods", "Cursors", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap"}
+            assert set(pages) == {"Integrations", "Behaviour", "Mods", "Cursors", "FastFlags", "Appearance", "Shortcuts", "Bloxstrap", "Application"}
             assert any(f["path"] == "CursorTypeTask.NewState" for f in pages["Mods"]["fields"])
             request({"op": "save", "changes": [
                 {"page": "Behaviour", "path": "BackgroundUpdates", "value": True},
@@ -125,6 +125,24 @@ def main():
             assert (target/"target-check.txt").read_text() == "again"
             marker.unlink()
             request({"op":"save"})
+            other = Path(temp)/"Versions/version-1111111111111111"
+            other.mkdir(parents=True)
+            (other/"RobloxPlayerBeta.exe").write_bytes(b"fixture")
+            selected = request({"op":"save", "changes":[
+                {"page":"Application","path":"InstalledVersion","value":str(other)},
+                {"page":"Application","path":"AppFont","value":"Consolas"},
+                {"page":"Application","path":"Corner","value":"MuitoRedondo"},
+                {"page":"Application","path":"ApplicationNotifications","value":False}]})
+            assert "Aplicado em version-1111111111111111" in selected["notice"]
+            assert json.loads((other/"ClientSettings/ClientAppSettings.json").read_text()) == expected_flags
+            assert selected["appFont"] == "Consolas" and selected["appCorner"] == 3
+            prefs = json.loads((Path(temp)/"Settings.json").read_text())
+            assert prefs["TargetVersionPath"] == str(other)
+            assert prefs["ApplicationNotifications"] is False
+            invalid = request({"op":"save","changes":[{"page":"Application","path":"InstalledVersion","value":str(Path(temp)/"unknown")}]}, ok=False)
+            assert not invalid["ok"]
+            request({"op":"save","changes":[{"page":"Application","path":"InstalledVersion","value":""}]})
+            print("Installed version selection and application preferences checks passed.")
             print("Target version application and restore checks passed.")
             # The graphics profile must persist, enforce its values, and restore the user's prior choices.
             before_profile = json.loads(flags_path.read_text())

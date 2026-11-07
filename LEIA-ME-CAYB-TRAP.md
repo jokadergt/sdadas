@@ -109,3 +109,14 @@ O perfil reaplica esses cinco valores ao salvar e ao carregar a configuração, 
 Este perfil reduz qualidade/detalhes; não transforma todas as partes em objetos sem textura e não remove ícones de avatares, inventários, itens ou VFX de todas as experiências. A lista pública consultada em 06/11/2026 não oferece controles globais para essas remoções. Não são apagados arquivos do cliente, não há alteração de memória ou scripts de mapas de terceiros. O efeito depende do cliente reconhecer as flags e do conteúdo do mapa; não foi medido ganho de FPS.
 
 Feche e reabra o Roblox pelo cayb trap para aplicar ou reverter. O teste Windows verifica gravação, persistência do backup, prioridade do perfil sobre edições conflitantes e restauração dos valores. Isso não substitui validação visual em uma sessão real do jogo.
+
+
+## Preferências do aplicativo e versões instaladas
+
+Na aba **Aplicativo**, escolha uma instalação Player detectada nas pastas Versions do cayb trap ou do Roblox em LocalAppData. O caminho completo distingue instalações com o mesmo GUID. Clique em Salvar com o Roblox fechado para aplicar os arquivos. A seleção não baixa versões nem muda o atualizador ou a versão iniciada pelo botão Roblox. O padrão mantém version-f0ea5da9412f4e35.
+
+A fonte da interface (Segoe UI, Arial, Consolas ou Minecraft) e os quatro níveis de arredondamento são salvos e aplicados à janela C++. O tema nativo usa fundo preto. O indicador de foco é ocultado no clique do mouse, mas permanece disponível para navegação por teclado.
+
+As notificações surgem no canto inferior direito após aplicar arquivos, por cinco segundos. Informe o nome de usuário público Roblox na aba Aplicativo para exibir o nome e avatar desse perfil; isso não verifica nem detecta a conta conectada. Não pede cookies, senha ou acesso à sessão. Se a consulta de perfil falhar, a mensagem indica a indisponibilidade. As notificações podem ser desativadas.
+
+A aplicação continua baseada em arquivos antes da abertura do jogo. O perfil gráfico reduz a qualidade, mas não remove globalmente texturas de Parts, Decals, Texture ou SurfaceAppearance dos mapas, nem contorna a lista de FastFlags aceita pelo Roblox.

@@ -6,18 +6,26 @@ internal static class TargetVersionMods
 {
     internal const string Version = "version-f0ea5da9412f4e35";
 
+    internal static string[] Installed()
+    {
+        var roots = new[] { Paths.Versions, Path.Combine(Paths.LocalAppData, "Roblox", "Versions") };
+        return roots.Where(Directory.Exists).SelectMany(root => Directory.GetDirectories(root, "version-*"))
+            .Where(path => File.Exists(Path.Combine(path, "RobloxPlayerBeta.exe")))
+            .Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(path => path).ToArray();
+    }
+
     public static string Apply()
     {
-        var roots = new[] { Paths.Versions, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Roblox", "Versions") };
-        var targets = roots.Select(root => Path.Combine(root, Version))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(path => File.Exists(Path.Combine(path, "RobloxPlayerBeta.exe"))).ToArray();
+        string selected = App.Settings.Prop.TargetVersionPath;
+        var targets = Installed().Where(path => selected == ""
+            ? Path.GetFileName(path) == Version : string.Equals(path, selected, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (targets.Length == 0)
-            return $"Salvo • {Version} não encontrada nas pastas de versões do cayb trap e Roblox";
+            return selected == "" ? $"Salvo • {Version} não encontrada; escolha uma versão instalada na aba Aplicativo"
+                : "Salvo • versão selecionada não encontrada; escolha outra na aba Aplicativo";
         if (ExistingRoblox.IsRunning(LaunchMode.Player))
-            return $"Salvo • feche o Roblox e clique em Salvar para aplicar em {Version}";
+            return "Salvo • feche o Roblox e clique em Salvar para aplicar na versão selecionada";
         foreach (var target in targets) ApplyTo(target);
-        return $"Aplicado em {Version} • abra novamente essa versão do Roblox";
+        return $"Aplicado em {Path.GetFileName(targets[0])} • abra novamente essa versão do Roblox";
     }
 
     internal static void ApplyTo(string target)
@@ -26,7 +34,7 @@ internal static class TargetVersionMods
             throw new DirectoryNotFoundException($"Instalação Roblox inválida: {target}");
         // Separate backups for stock and launcher installations of the same GUID.
         string key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(target).ToUpperInvariant())));
-        string backup = Path.Combine(Paths.Base, "Backups", Version, key);
+        string backup = Path.Combine(Paths.Base, "Backups", "InstalledVersions", key);
         string manifest = Path.Combine(backup, "manifest.json");
         var previous = File.Exists(manifest)
             ? JsonSerializer.Deserialize<Dictionary<string, bool>>(File.ReadAllText(manifest))! : new Dictionary<string, bool>();

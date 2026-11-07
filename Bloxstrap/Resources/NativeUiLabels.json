@@ -90,5 +90,11 @@
     "BackgroundFileCacheCleaner": "Limpar cache de arquivos em segundo plano (RAM ≥85%, administrador)",
     "BackgroundUpdates": "Atualizar o Roblox em segundo plano",
     "ForceRobloxReinstallation": "Reinstalar o Roblox na próxima abertura"
+  },
+  "Application": {
+    "AppFont": "Fonte do aplicativo",
+    "Corner": "Arredondamento dos cantos",
+    "ProfileUsername": "Nome de usuário Roblox para a notificação (sem @)",
+    "ApplicationNotifications": "Notificar quando os arquivos forem aplicados"
   }
 }

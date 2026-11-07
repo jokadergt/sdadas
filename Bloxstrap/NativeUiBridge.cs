@@ -17,7 +17,7 @@ internal sealed class NativeUiBridge
         ["Integrations"] = "Integrações", ["Behaviour"] = "Comportamento",
         ["Mods"] = "Modificações", ["Cursors"] = "Cursores", ["FastFlags"] = "FastFlags",
         ["Appearance"] = "Aparência", ["Shortcuts"] = "Atalhos",
-        ["Bloxstrap"] = "cayb trap"
+        ["Application"] = "Aplicativo", ["Bloxstrap"] = "cayb trap"
     };
     private Dictionary<string, Dictionary<string, string>> _labels = new();
     private readonly SweezyCursorCatalog _catalog = new();
@@ -89,6 +89,7 @@ internal sealed class NativeUiBridge
         _models["Appearance"] = new AppearanceViewModel(new Page());
         _models["Shortcuts"] = new ShortcutsViewModel();
         _models["Bloxstrap"] = new BloxstrapViewModel();
+        _models["Application"] = new AppPreferencesViewModel();
         using var labels = new StreamReader(Resource.GetStream("NativeUiLabels.json"));
         _labels = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(labels.ReadToEnd())!;
     }
@@ -165,7 +166,11 @@ internal sealed class NativeUiBridge
             else if (!property.CanWrite) continue;
             bool enabled = !(page == "FastFlags" && App.Settings.Prop.LowGraphicsMode &&
                 path is "UseFastFlagManager" or "SelectedMSAALevel" or "SelectedTextureQuality");
-            if (type == typeof(bool))
+            if (page == "Application" && path == "InstalledVersion")
+                yield return new { path, label = "Versão instalada que receberá os mods", kind = "enum", value,
+                    choices = new[] { "" }.Concat(TargetVersionMods.Installed()).ToArray(),
+                    choiceLabels = new[] { "Padrão: " + TargetVersionMods.Version }.Concat(TargetVersionMods.Installed()).ToArray() };
+            else if (type == typeof(bool))
             {
                 yield return new { path, label = Label(page, path), kind = "bool", value, enabled };
                 if (page == "FastFlags" && path == "LowGraphicsMode")
@@ -201,6 +206,7 @@ internal sealed class NativeUiBridge
             results = _cursorItems.Select(item => new { slug = item.Slug, name = item.Name, animated = item.Animated }).ToArray(),
             cursorPreview = _cursorPreview?.Cursor ?? "", pointerPreview = _cursorPreview?.Pointer ?? "",
             installedName = App.State.Prop.SweezyCursorName },
+        appFont = App.Settings.Prop.AppFont.ToString(), appCorner = (int)App.Settings.Prop.AppCorner,
         version = App.Version, bubbleSounds = App.Settings.Prop.BubbleSounds, theme = _installed ? App.Settings.Prop.Theme.GetFinal().ToString() : "Dark",
         pages = _models.Select(pair => new { id = pair.Key, title = _titles[pair.Key], fields = Fields(pair.Key, pair.Value).ToArray() }).ToArray()
     };
@@ -265,7 +271,14 @@ internal sealed class NativeUiBridge
         App.PendingSettingTasks.Clear();
         _dirty = false;
         FileCacheCleaner.StartIfEnabled();
+        ApplyToSelectedVersion();
+    }
+
+    private void ApplyToSelectedVersion()
+    {
         _notice = TargetVersionMods.Apply();
+        if (_notice.StartsWith("Aplicado em", StringComparison.Ordinal) && App.Settings.Prop.ApplicationNotifications)
+            _ = ApplicationToast.Show(_notice);
     }
 
     private static string? DiskHash(string path) => File.Exists(path) ? MD5Hash.FromFile(path) : null;
@@ -312,7 +325,7 @@ internal sealed class NativeUiBridge
                     App.State.Prop.SweezyCursorSlug = item.Slug; App.State.Prop.SweezyCursorName = item.Name;
                     App.State.Save(); Verify(App.State); RememberDisk();
                     _models["Mods"] = new ModsViewModel();
-                    _notice = "Cursor preparado — será aplicado na próxima abertura do Roblox";
+                    ApplyToSelectedVersion();
                 }
                 else _notice = "Prévia estática pronta. Clique em Usar no Roblox para aplicar.";
                 break;
@@ -320,7 +333,7 @@ internal sealed class NativeUiBridge
                 await Save(); SweezyCursorCatalog.Reset();
                 App.State.Prop.SweezyCursorSlug = ""; App.State.Prop.SweezyCursorName = "";
                 App.State.Save(); Verify(App.State); RememberDisk(); _models["Mods"] = new ModsViewModel();
-                _notice = "Cursor padrão preparado para a próxima abertura do Roblox";
+                ApplyToSelectedVersion();
                 break;
             case "apply": break;
             case "save": await Save(); break;

@@ -4,6 +4,11 @@ namespace Bloxstrap.Models.Persistable
 {
     public class Settings
     {
+        public string TargetVersionPath { get; set; } = "";
+        public UI.ViewModels.Settings.AppTypeface AppFont { get; set; } = UI.ViewModels.Settings.AppTypeface.SegoeUI;
+        public UI.ViewModels.Settings.AppCorner AppCorner { get; set; } = UI.ViewModels.Settings.AppCorner.Redondo;
+        public string ProfileUsername { get; set; } = "";
+        public bool ApplicationNotifications { get; set; } = true;
         // bloxstrap configuration
         public BootstrapperStyle BootstrapperStyle { get; set; } = BootstrapperStyle.FluentDialog;
         public BootstrapperIcon BootstrapperIcon { get; set; } = BootstrapperIcon.IconBloxstrap;

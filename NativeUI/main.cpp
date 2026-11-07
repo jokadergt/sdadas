@@ -15,6 +15,7 @@
 #include <mmsystem.h>
 #include <objidl.h>
 #include <gdiplus.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <thread>
@@ -26,8 +27,10 @@ using json = nlohmann::json;
 static HWND windowHandle, nav, panel, heading, status, saveButton, installButton;
 static HINSTANCE instance;
 static HFONT font, titleFont;
+static int corner = 24;
+static std::string currentFont = "SegoeUI";
 static HBRUSH background, cardBrush;
-static COLORREF canvasColor = RGB(32,32,32), inkColor = RGB(240,240,240), cardColor = RGB(48,48,48), selectionColor = RGB(52,52,52);
+static COLORREF canvasColor = RGB(0,0,0), inkColor = RGB(240,240,240), cardColor = RGB(14,14,14), selectionColor = RGB(28,28,28);
 static bool darkTheme = true;
 static bool bubbleSounds = true;
 static HANDLE engineInput = nullptr, engineProcess = nullptr;
@@ -71,7 +74,7 @@ static void bubbleClick() {
 static void roundControl(HWND h) {
     RECT r{}; GetClientRect(h, &r);
     if (r.right <= 0 || r.bottom <= 0) return;
-    HRGN region = CreateRoundRectRgn(0, 0, r.right + 1, r.bottom + 1, 14, 14);
+    HRGN region = CreateRoundRectRgn(0, 0, r.right + 1, r.bottom + 1, corner, corner);
     if (!SetWindowRgn(h, region, TRUE)) DeleteObject(region);
 }
 static bool drawButton(LPARAM lp) {
@@ -84,16 +87,17 @@ static bool drawButton(LPARAM lp) {
     COLORREF fill = primary && enabled ? RGB(96,205,255) : (item->itemState & ODS_SELECTED) ? selectionColor : cardColor;
     HBRUSH brush = CreateSolidBrush(fill); HPEN pen = CreatePen(PS_SOLID, 1, selectionColor);
     HGDIOBJ oldBrush = SelectObject(dc, brush), oldPen = SelectObject(dc, pen), oldFont = SelectObject(dc, font);
-    RoundRect(dc, r.left, r.top, r.right, r.bottom, 14, 14);
+    RoundRect(dc, r.left, r.top, r.right, r.bottom, corner, corner);
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, !enabled ? RGB(135,135,135) : primary ? RGB(16,25,30) : inkColor);
     auto label = text(item->hwndItem); InflateRect(&r, -10, -3);
     DrawTextW(dc, label.c_str(), -1, &r, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-    if (item->itemState & ODS_FOCUS) { InflateRect(&r, -2, -2); DrawFocusRect(dc, &r); }
+    if ((item->itemState & ODS_FOCUS) && GetKeyState(VK_LBUTTON) >= 0 && (SendMessageW(item->hwndItem, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS) == 0) { InflateRect(&r, -2, -2); DrawFocusRect(dc, &r); }
     SelectObject(dc, oldFont); SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(brush); DeleteObject(pen);
     return true;
 }
 static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
+    if (msg == WM_LBUTTONDOWN) SendMessageW(h, WM_CHANGEUISTATE, MAKEWPARAM(UIS_SET, UISF_HIDEFOCUS), 0);
     if (msg == WM_SIZE) roundControl(h);
     if (msg == WM_KEYDOWN && wp == VK_RETURN && GetDlgCtrlID(h) == 4001) {
         HWND parent = GetParent(h);
@@ -108,7 +112,7 @@ static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM l
         PAINTSTRUCT ps{}; HDC dc = BeginPaint(h, &ps); RECT r{}; GetClientRect(h, &r);
         FillRect(dc, &r, background);
         HBRUSH card = CreateSolidBrush(cardColor); HGDIOBJ oldBrush = SelectObject(dc, card), oldPen = SelectObject(dc, GetStockObject(NULL_PEN));
-        RoundRect(dc, 0, 0, r.right, r.bottom, 14, 14);
+        RoundRect(dc, 0, 0, r.right, r.bottom, corner, corner);
         bool checked = SendMessageW(h, BM_GETCHECK, 0, 0) == BST_CHECKED;
         int x = r.right - 52, y = (r.bottom - 20) / 2;
         HBRUSH track = CreateSolidBrush(checked ? RGB(96,205,255) : selectionColor); SelectObject(dc, track);
@@ -120,7 +124,7 @@ static LRESULT CALLBACK RoundedControlProc(HWND h, UINT msg, WPARAM wp, LPARAM l
         DrawTextW(dc, value.c_str(), -1, &measure, DT_WORDBREAK | DT_CALCRECT);
         label.top = std::max(0L, (r.bottom - measure.bottom) / 2);
         DrawTextW(dc, value.c_str(), -1, &label, DT_WORDBREAK);
-        if (GetFocus() == h) { RECT focus{6,6,r.right-6,r.bottom-6}; DrawFocusRect(dc, &focus); }
+        if (GetFocus() == h && (SendMessageW(h, WM_QUERYUISTATE, 0, 0) & UISF_HIDEFOCUS) == 0) { RECT focus{6,6,r.right-6,r.bottom-6}; DrawFocusRect(dc, &focus); }
         SelectObject(dc, oldFont); SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
         DeleteObject(card); DeleteObject(track); DeleteObject(thumb); EndPaint(h, &ps); return 0;
     }
@@ -273,7 +277,7 @@ static bool drawCursorRow(LPARAM lp) {
     auto value=data["results"][item->itemID];RECT r=item->rcItem;FillRect(item->hDC,&r,background);
     HBRUSH brush=CreateSolidBrush((item->itemState&ODS_SELECTED)?selectionColor:cardColor);
     auto old=SelectObject(item->hDC,brush);auto pen=SelectObject(item->hDC,GetStockObject(NULL_PEN));
-    RoundRect(item->hDC,r.left,r.top+2,r.right,r.bottom-2,14,14);SelectObject(item->hDC,old);SelectObject(item->hDC,pen);DeleteObject(brush);
+    RoundRect(item->hDC,r.left,r.top+2,r.right,r.bottom-2,corner,corner);SelectObject(item->hDC,old);SelectObject(item->hDC,pen);DeleteObject(brush);
     SetBkMode(item->hDC,TRANSPARENT);SetTextColor(item->hDC,inkColor);SelectObject(item->hDC,font);
     RECT name{r.left+10,r.top+6,r.right-10,r.top+42};auto label=wide(value["name"].get<std::string>());
     DrawTextW(item->hDC,label.c_str(),-1,&name,DT_WORDBREAK|DT_END_ELLIPSIS);
@@ -543,7 +547,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         bool selected = item->itemState & ODS_SELECTED;
         HBRUSH brush = CreateSolidBrush(selected ? selectionColor : canvasColor); FillRect(item->hDC, &item->rcItem, background);
         HGDIOBJ previousBrush = SelectObject(item->hDC, brush), previousPen = SelectObject(item->hDC, GetStockObject(NULL_PEN));
-        RoundRect(item->hDC, item->rcItem.left, item->rcItem.top, item->rcItem.right, item->rcItem.bottom, 14, 14);
+        RoundRect(item->hDC, item->rcItem.left, item->rcItem.top, item->rcItem.right, item->rcItem.bottom, corner, corner);
         SelectObject(item->hDC, previousBrush); SelectObject(item->hDC, previousPen); DeleteObject(brush);
         if (selected) { RECT marker = item->rcItem; marker.right = marker.left + 3; marker.top += 10; marker.bottom -= 10;
             HBRUSH accent = CreateSolidBrush(RGB(96, 205, 255)); FillRect(item->hDC, &marker, accent); DeleteObject(accent); }
@@ -569,11 +573,22 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         snapshot = *reply;
         bubbleSounds = snapshot.value("bubbleSounds", true);
-        darkTheme = snapshot.value("theme", "Dark") != "Light";
-        canvasColor = darkTheme ? RGB(32,32,32) : RGB(243,243,243);
+        darkTheme = true;
+        corner = 8 + 8 * std::clamp(snapshot.value("appCorner", 2), 0, 3);
+        auto selectedFont = snapshot.value("appFont", std::string("SegoeUI"));
+        if (selectedFont != currentFont) {
+            const wchar_t* face = selectedFont == "Arial" ? L"Arial" : selectedFont == "Consolas" ? L"Consolas" : selectedFont == "Minecraft" ? L"Minecraft" : L"Segoe UI";
+            HFONT old = font, oldTitle = titleFont;
+            font = CreateFontW(-16,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,face);
+            titleFont = CreateFontW(-26,0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,face);
+            EnumChildWindows(windowHandle, [](HWND child, LPARAM) -> BOOL { SendMessageW(child,WM_SETFONT,(WPARAM)font,TRUE); return TRUE; },0);
+            SendMessageW(heading,WM_SETFONT,(WPARAM)titleFont,TRUE);
+            DeleteObject(old); DeleteObject(oldTitle); currentFont = selectedFont;
+        }
+        canvasColor = darkTheme ? RGB(0,0,0) : RGB(243,243,243);
         inkColor = darkTheme ? RGB(240,240,240) : RGB(24,24,24);
-        cardColor = darkTheme ? RGB(48,48,48) : RGB(255,255,255);
-        selectionColor = darkTheme ? RGB(52,52,52) : RGB(225,225,225);
+        cardColor = darkTheme ? RGB(14,14,14) : RGB(255,255,255);
+        selectionColor = darkTheme ? RGB(28,28,28) : RGB(225,225,225);
         HBRUSH oldBackground = background, oldCard = cardBrush;
         background = CreateSolidBrush(canvasColor); cardBrush = CreateSolidBrush(cardColor);
         SetClassLongPtrW(windowHandle, GCLP_HBRBACKGROUND, (LONG_PTR)background);
@@ -581,7 +596,7 @@ static LRESULT CALLBACK WindowProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         DeleteObject(oldBackground); DeleteObject(oldCard);
         BOOL dark = darkTheme; DwmSetWindowAttribute(windowHandle, 20, &dark, sizeof(dark));
         EnumChildWindows(windowHandle, [](HWND child, LPARAM) -> BOOL {
-            SetWindowTheme(child, darkTheme ? L"DarkMode_Explorer" : L"Explorer", nullptr); return TRUE;
+            SetWindowTheme(child, darkTheme ? L"DarkMode_Explorer" : L"Explorer", nullptr); roundControl(child); return TRUE;
         }, 0);
         InvalidateRect(windowHandle, nullptr, TRUE);
         rebuilding = true; SendMessageW(nav, LB_RESETCONTENT, 0, 0);
@@ -646,6 +661,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int show) {
     }
     HANDLE singleton = CreateMutexW(nullptr, FALSE, L"Local\\CaybTrapCppSettings");
     if (GetLastError() == ERROR_ALREADY_EXISTS) { MessageBoxW(nullptr, L"A interface já está aberta.", L"cayb trap", MB_OK); if (singleton) CloseHandle(singleton); return 0; }
+    HRSRC fontResource = FindResourceW(instance, MAKEINTRESOURCEW(4), RT_RCDATA);
+    if (fontResource) { DWORD count = 0; AddFontMemResourceEx(LockResource(LoadResource(instance,fontResource)), SizeofResource(instance,fontResource), nullptr, &count); }
     INITCOMMONCONTROLSEX ic{sizeof(ic), ICC_STANDARD_CLASSES}; InitCommonControlsEx(&ic);
     font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
     titleFont = CreateFontW(-26, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
