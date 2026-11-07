@@ -99,6 +99,33 @@ def main():
             assert settings["BackgroundUpdatesEnabled"] is True
             assert settings["BootstrapperTitle"] == "Capybara test"
             assert json.loads(flags_path.read_text()) == expected_flags, "Unlisted flags were not removed"
+            missing = request({"op":"save"})
+            assert "não encontrada" in missing["notice"]
+            target = Path(temp)/"Versions/version-f0ea5da9412f4e35"
+            target.mkdir(parents=True)
+            (target/"RobloxPlayerBeta.exe").write_bytes(b"fixture")
+            families = target/"content/fonts/families"
+            families.mkdir(parents=True)
+            family = families/"Test.json"
+            family.write_text(json.dumps({"name":"Test","faces":[{"assetId":"original"}]}))
+            marker = Path(temp)/"Modifications/target-check.txt"
+            marker.write_text("custom")
+            (target/"target-check.txt").write_text("original")
+            applied = request({"op":"save"})
+            assert "Aplicado em version-f0ea5da9412f4e35" in applied["notice"]
+            assert json.loads((target/"ClientSettings/ClientAppSettings.json").read_text()) == expected_flags
+            assert (target/"content/fonts/CustomFont.ttf").read_bytes() == custom_font.read_bytes()
+            assert json.loads(family.read_text())["faces"][0]["assetId"] == "rbxasset://fonts/CustomFont.ttf"
+            assert (target/"target-check.txt").read_text() == "custom"
+            marker.unlink()
+            request({"op":"save"})
+            assert (target/"target-check.txt").read_text() == "original"
+            marker.write_text("again")
+            request({"op":"save"})
+            assert (target/"target-check.txt").read_text() == "again"
+            marker.unlink()
+            request({"op":"save"})
+            print("Target version application and restore checks passed.")
             # The graphics profile must persist, enforce its values, and restore the user's prior choices.
             before_profile = json.loads(flags_path.read_text())
             assert settings["LowGraphicsMode"] is False

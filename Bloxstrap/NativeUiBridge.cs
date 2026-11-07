@@ -265,8 +265,7 @@ internal sealed class NativeUiBridge
         App.PendingSettingTasks.Clear();
         _dirty = false;
         FileCacheCleaner.StartIfEnabled();
-        _notice = ExistingRoblox.IsRunning(LaunchMode.Player) || ExistingRoblox.IsRunning(LaunchMode.Studio)
-            ? "Salvo • fonte/flags na próxima abertura do jogo" : "Configurações salvas";
+        _notice = TargetVersionMods.Apply();
     }
 
     private static string? DiskHash(string path) => File.Exists(path) ? MD5Hash.FromFile(path) : null;
