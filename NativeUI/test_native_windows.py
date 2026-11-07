@@ -10,6 +10,7 @@ def check_native(executable):
     callback = c.WINFUNCTYPE(w.BOOL, w.HWND, w.LPARAM)
     api.SendMessageW.argtypes = [w.HWND, w.UINT, w.WPARAM, w.LPARAM]
     api.SendMessageW.restype = c.c_ssize_t
+    api.IsWindowEnabled.argtypes = [w.HWND]
     api.GetWindowTextW.argtypes = [w.HWND, w.LPWSTR, c.c_int]
     api.GetClassNameW.argtypes = [w.HWND, w.LPWSTR, c.c_int]
     api.GetWindowThreadProcessId.argtypes = [w.HWND, c.POINTER(w.DWORD)]
@@ -54,10 +55,12 @@ def check_native(executable):
         main = wait_for(find_main)
         nav = wait_for(lambda: next((h for h in windows(main) if label(h,True).lower()=="listbox"),None))
         wait_for(lambda: api.SendMessageW(nav,0x18B,0,0)==9)  # LB_GETCOUNT
-        for index,title in enumerate(["Integrações","Comportamento","Modificações","Cursores","FastFlags","Aparência","Atalhos","cayb trap","Aplicativo"]):
+        for index,title in enumerate(["Integrações","Comportamento","Modificações","Cursores para Roblox","FastFlags","Aparência","Atalhos","cayb trap","Aplicativo"]):
+            wait_for(lambda: api.IsWindowEnabled(nav))
             api.SendMessageW(nav,0x186,index,0)  # LB_SETCURSEL
             api.SendMessageW(main,0x111,(1<<16)|1,nav)
-            wait_for(lambda: title in [label(h) for h in windows(main)])
+            wait_for(lambda: api.IsWindowEnabled(nav) and title in [label(h) for h in windows(main)])
+            print("Native tab checked:", title, flush=True)
             time.sleep(.25)  # allow the navigation timer to finish
         api.SendMessageW(main,0x10,0,0)
         assert process.wait(timeout=15)==0
